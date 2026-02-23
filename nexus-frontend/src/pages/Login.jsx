@@ -42,6 +42,14 @@ export default function Login() {
     <div style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--black)", padding: "20px" }}>
       <div className="card-hover" style={{ padding: "40px", borderRadius: "16px", background: "var(--card)", maxWidth: "400px", width: "100%" }}>
         
+        <button 
+          className="btn-ghost" 
+          onClick={() => navigate("/")} 
+          style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 16px", borderRadius: "8px", fontSize: "13px", marginBottom: "24px", width: "fit-content" }}
+        >
+          ← Back to Home
+        </button>
+
         <div style={{ width: "48px", height: "48px", background: "var(--orange)", borderRadius: "12px", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Bebas Neue'", fontSize: "28px", color: "white", margin: "0 auto 24px" }}>N</div>
         
         <h2 style={{ fontFamily: "'Bebas Neue'", fontSize: "32px", letterSpacing: "0.05em", marginBottom: "8px", textAlign: "center" }}>
