@@ -1,8 +1,9 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { auth } from "../services/firebase";
+import { auth, googleProvider } from "../services/firebase";
 import { 
   createUserWithEmailAndPassword, 
-  signInWithEmailAndPassword, 
+  signInWithEmailAndPassword,
+  signInWithPopup,
   onAuthStateChanged, 
   signOut,
   updateProfile,
@@ -47,6 +48,31 @@ export function AuthProvider({ children }) {
     return signInWithEmailAndPassword(auth, email, password);
   };
 
+  // 3. Google Sign-In (works for both clients and admins)
+  const loginWithGoogle = async () => {
+    const result = await signInWithPopup(auth, googleProvider);
+    const user = result.user;
+    // Only save to Firestore if brand-new AND not an admin
+    const isNewUser = user.metadata.creationTime === user.metadata.lastSignInTime;
+    if (isNewUser && !ADMIN_EMAILS.includes(user.email)) {
+      try {
+        await api.post('/clients', {
+          uid: user.uid,
+          name: user.displayName || user.email.split('@')[0],
+          email: user.email,
+          plan: "Pending Request",
+          mrr: 0,
+          campaigns: 0,
+          since: new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+          avatar: (user.displayName || 'U').charAt(0).toUpperCase()
+        });
+      } catch (err) {
+        console.error("Client auto-register error (may already exist):", err);
+      }
+    }
+    return result;
+  };
+
   const logout = () => signOut(auth);
 
   const resetPassword = (email) => sendPasswordResetEmail(auth, email);
@@ -66,7 +92,9 @@ export function AuthProvider({ children }) {
     isAdmin,
     registerClient,
     login,
-    logout
+    loginWithGoogle,
+    logout,
+    resetPassword
   };
 
   return (
