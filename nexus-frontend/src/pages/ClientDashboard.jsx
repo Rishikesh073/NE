@@ -1,10 +1,14 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import api from "../services/api"; 
 import { useAuth } from "../contexts/AuthContext";
+// NEW FIREBASE STORAGE IMPORTS
+import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+import { storage } from "../services/firebase";
 
 export default function ClientDashboard() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { currentUser, logout } = useAuth(); 
   const [activeTab, setActiveTab] = useState("overview");
   
@@ -15,60 +19,96 @@ export default function ClientDashboard() {
   const [chatHistory, setChatHistory] = useState([]);
   const [chatMsg, setChatMsg] = useState("");
   const [myRequests, setMyRequests] = useState([]); 
+  const [myAssets, setMyAssets] = useState([]); // <-- ASSETS STATE
   const [loading, setLoading] = useState(true);
+  const [uploadProgress, setUploadProgress] = useState(0); // <-- PROGRESS STATE
 
-  // AI INTAKE FORM STATES (Fully Restored)
-  const [showIntakeForm, setShowIntakeForm] = useState(false);
+  // PROFILE STATE
+  const [profileForm, setProfileForm] = useState({ companyName: "", contactName: "", email: "", phone: "", industry: "", website: "" });
+
+  // INTAKE FORM & CHECKOUT STATES
+  const [showCheckout, setShowCheckout] = useState(false);
   const [intakeData, setIntakeData] = useState({
-    businessUrl: "", 
-    targetAudience: "",
-    monthlyBudget: "",
-    primaryGoal: "Lead Generation",
-    secondaryGoal: "Brand Awareness",
-    channels: []
+    selectedTier: "GROWTH", // Default selection
+    businessUrl: "", targetAudience: "", monthlyBudget: "",
+    primaryGoal: "Lead Generation", secondaryGoal: "Brand Awareness", channels: []
   });
 
-  const availableGoals = [
-    "Lead Generation", "Direct E-commerce Sales", "Brand Awareness", 
-    "Website Traffic", "App Installs", "Local Store Foot Traffic", "Community Engagement"
-  ];
-  const availableChannels = [
-    "Google Ads", "Meta (Facebook/Instagram)", "Instagram (Specific)", 
-    "LinkedIn B2B", "SEO", "Email Automation", "TikTok"
+  const availableGoals = ["Lead Generation", "Direct E-commerce Sales", "Brand Awareness", "Website Traffic", "App Installs"];
+  const availableChannels = ["Google Ads", "Meta (Facebook/Instagram)", "LinkedIn B2B", "SEO", "TikTok"];
+
+  const pricingTiers = [
+    { name: "STARTER", price: 199, desc: "Perfect for local businesses.", features: ["1 AI Campaign", "Meta Ads Only"] },
+    { name: "GROWTH", price: 299, desc: "For scaling operations.", features: ["3 AI Campaigns", "Meta + Google Ads"] },
+    { name: "ENTERPRISE", price: 499, desc: "Full autonomous takeover.", features: ["Unlimited Campaigns", "Omnichannel"] }
   ];
 
-  // FETCH LIVE DATA ON MOUNT
   useEffect(() => {
     const fetchData = async () => {
       if (!currentUser) return;
       try {
         const safeGet = (url) => api.get(url).catch(() => ({ data: [] }));
 
-        const [campRes, reqRes, clientsRes, taskRes, msgRes] = await Promise.all([
-          safeGet('/campaigns'),
-          safeGet('/service-requests'),
-          safeGet('/clients'),
-          safeGet('/tasks'),
-          safeGet('/messages')
+        const [campRes, reqRes, clientsRes, taskRes, msgRes, assetRes] = await Promise.all([
+          safeGet('/campaigns'), safeGet('/service-requests'), safeGet('/clients'), safeGet('/tasks'), safeGet('/messages'), safeGet('/assets')
         ]);
         
-        // STRICT DATA SILOS
         setCampaigns(campRes.data.filter(c => c.clientId === currentUser.uid));
         setMyRequests(reqRes.data.filter(r => r.clientId === currentUser.uid));
         setTasks(taskRes.data.filter(t => t.clientId === currentUser.uid));
         setChatHistory(msgRes.data.filter(m => m.clientId === currentUser.uid || m.to === currentUser.uid));
+        setMyAssets(assetRes.data.filter(a => a.clientId === currentUser.uid)); // <-- Fetch isolated assets
         
         const myProfile = clientsRes.data.find(c => c.uid === currentUser.uid);
-        if (myProfile) setClientData(myProfile);
-
+        if (myProfile) {
+          setClientData(myProfile);
+          setProfileForm({
+            companyName: myProfile.companyName || currentUser.displayName || "",
+            contactName: myProfile.contactName || currentUser.displayName || "",
+            email: myProfile.email || currentUser.email || "",
+            phone: myProfile.phone || "",
+            industry: myProfile.industry || "",
+            website: myProfile.website || ""
+          });
+        }
       } catch (error) {
-        console.error("Critical error fetching data:", error);
-      } finally {
-        setLoading(false);
-      }
+        console.error("Data error:", error);
+      } finally { setLoading(false); }
     };
     fetchData();
   }, [currentUser]);
+
+  const handleSaveProfile = async () => {
+    try {
+      await api.put(`/clients/${currentUser.uid}`, profileForm);
+      setClientData({ ...clientData, ...profileForm });
+      alert("Profile updated securely.");
+    } catch (err) { alert("Error saving profile. Make sure Express server is running."); }
+  };
+
+  const handleProceedToCheckout = (e) => {
+    e.preventDefault();
+    if(intakeData.channels.length === 0) return alert("Select at least one channel.");
+    setShowCheckout(true); 
+  };
+
+  const processPaymentAndSubmit = async () => {
+    try {
+      await api.post('/service-requests', {
+        clientId: currentUser.uid, 
+        clientName: profileForm.companyName || currentUser.displayName, 
+        clientEmail: currentUser.email,
+        requirements: intakeData, 
+        status: "pending_admin_review", 
+        submittedAt: new Date().toISOString()
+      });
+      setShowCheckout(false);
+      setActiveTab("overview");
+      const reqRes = await api.get('/service-requests').catch(() => ({ data: [] }));
+      setMyRequests(reqRes.data.filter(r => r.clientId === currentUser?.uid));
+      alert("Payment Successful! AI Agent Brief submitted to Admin.");
+    } catch (error) { alert("Error submitting request."); }
+  };
 
   const handleLogout = async () => {
     await logout();
@@ -79,33 +119,38 @@ export default function ClientDashboard() {
     if (!chatMsg.trim()) return;
     const newMsg = { 
       clientId: currentUser.uid,
-      from: currentUser?.displayName || "User", 
-      msg: chatMsg, type: "user", unread: true, 
-      avatar: currentUser?.photoURL || "U",
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      from: currentUser?.displayName || "User", msg: chatMsg, type: "user", unread: true, 
+      avatar: currentUser?.photoURL || "U", time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
     setChatHistory(h => [...h, newMsg]);
     setChatMsg("");
     try { await api.post('/messages', newMsg); } catch (e) {}
   };
 
-  const submitIntakeForm = async (e) => {
-    e.preventDefault();
-    try {
-      await api.post('/service-requests', {
-        clientId: currentUser?.uid, 
-        clientName: currentUser?.displayName, 
-        clientEmail: currentUser?.email,
-        requirements: intakeData, 
-        status: "pending_admin_review", 
-        submittedAt: new Date().toISOString()
-      });
-      setShowIntakeForm(false);
-      const reqRes = await api.get('/service-requests').catch(() => ({ data: [] }));
-      setMyRequests(reqRes.data.filter(r => r.clientId === currentUser?.uid));
-    } catch (error) {
-      alert("Backend Error 500: Unable to save. Check your Node server connection.");
-    }
+  // --- REAL FIREBASE ASSET UPLOAD LOGIC ---
+  const handleAssetUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    // Create a reference in Firebase Storage
+    const storageRef = ref(storage, `client_assets/${currentUser.uid}_${Date.now()}_${file.name}`);
+    const uploadTask = uploadBytesResumable(storageRef, file);
+
+    // Track upload progress
+    uploadTask.on('state_changed', 
+      (snapshot) => setUploadProgress(Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100)),
+      (error) => { console.error(error); alert("Upload failed!"); setUploadProgress(0); },
+      async () => {
+        // Get the URL and save to Express Backend
+        const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+        const newAsset = { clientId: currentUser.uid, name: file.name, url: downloadURL, type: file.type };
+        try {
+          const res = await api.post('/assets', newAsset);
+          setMyAssets([...myAssets, { id: res.data.id, ...newAsset }]);
+          setUploadProgress(0);
+        } catch (err) { alert("Failed to save asset record."); setUploadProgress(0); }
+      }
+    );
   };
 
   const totalSpend = campaigns.reduce((sum, c) => sum + (Number(c.spend) || 0), 0);
@@ -114,8 +159,10 @@ export default function ClientDashboard() {
   
   const sidebarItems = [
     { id: "overview", icon: "⊡", label: "Overview" },
+    { id: "deploy", icon: "🚀", label: "Launch Agent" }, 
     { id: "campaigns", icon: "◉", label: "Live Campaigns" },
     { id: "analytics", icon: "▲", label: "Analytics" }, 
+    { id: "assets", icon: "📁", label: "Brand Assets" }, 
     { id: "tasks", icon: "☑", label: "Tasks" },
     { id: "chat", icon: "✉", label: "Support Chat" },
     { id: "profile", icon: "◆", label: "My Profile" },
@@ -134,9 +181,9 @@ export default function ClientDashboard() {
 
         <nav style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
           {sidebarItems.map(item => (
-            <div key={item.id} className={`sidebar-item ${activeTab === item.id ? "active" : ""}`} onClick={() => setActiveTab(item.id)}>
+            <div key={item.id} className={`sidebar-item ${activeTab === item.id ? "active" : ""}`} onClick={() => setActiveTab(item.id)} style={{ color: item.id === 'deploy' ? "var(--orange)" : "" }}>
               <span style={{ fontSize: "16px" }}>{item.icon}</span>
-              <span>{item.label}</span>
+              <span style={{ fontWeight: item.id === 'deploy' ? 700 : 400 }}>{item.label}</span>
             </div>
           ))}
         </nav>
@@ -175,56 +222,107 @@ export default function ClientDashboard() {
             <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "16px" }}>
                 <div className="card-hover" style={{ padding: "24px", borderRadius: "16px", background: "var(--card)" }}>
-                  <div style={{ fontSize: "12px", color: "var(--text-dimmer)", textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: "'JetBrains Mono'" }}>Active Campaigns</div>
+                  <div style={{ fontSize: "12px", color: "var(--text-dimmer)", textTransform: "uppercase" }}>Active Campaigns</div>
                   <div style={{ fontFamily: "'Bebas Neue'", fontSize: "42px", color: "var(--neon-green)" }}>{campaigns.length}</div>
                 </div>
                 <div className="card-hover" style={{ padding: "24px", borderRadius: "16px", background: "var(--card)" }}>
-                  <div style={{ fontSize: "12px", color: "var(--text-dimmer)", textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: "'JetBrains Mono'" }}>Total Ad Spend</div>
+                  <div style={{ fontSize: "12px", color: "var(--text-dimmer)", textTransform: "uppercase" }}>Total Ad Spend</div>
                   <div style={{ fontFamily: "'Bebas Neue'", fontSize: "42px", color: "var(--orange)" }}>${totalSpend.toLocaleString()}</div>
                 </div>
                 <div className="card-hover" style={{ padding: "24px", borderRadius: "16px", background: "var(--card)" }}>
-                  <div style={{ fontSize: "12px", color: "var(--text-dimmer)", textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: "'JetBrains Mono'" }}>Leads Generated</div>
+                  <div style={{ fontSize: "12px", color: "var(--text-dimmer)", textTransform: "uppercase" }}>Leads Generated</div>
                   <div style={{ fontFamily: "'Bebas Neue'", fontSize: "42px", color: "var(--neon-blue)" }}>{totalLeads.toLocaleString()}</div>
                 </div>
               </div>
 
-              <div className="card-hover" style={{ padding: "28px", borderRadius: "16px", background: "var(--card)", marginTop: "16px" }}>
-                <h3 style={{ fontWeight: 700, fontSize: "16px", marginBottom: "24px" }}>System Status</h3>
-                {campaigns.length === 0 ? (
-                  myRequests.length > 0 ? (
-                    <div style={{ textAlign: "center", padding: "60px 20px" }}>
-                      <div style={{ fontSize: "40px", marginBottom: "16px", color: myRequests[0]?.status === 'approved' ? "var(--neon-green)" : "var(--orange)" }}>
-                        {myRequests[0]?.status === 'approved' ? "🚀" : "⏳"}
-                      </div>
-                      <h4 style={{ fontSize: "20px", marginBottom: "8px", fontFamily: "'Bebas Neue'", letterSpacing: "0.05em" }}>
-                        {myRequests[0]?.status === 'approved' ? "AI AGENT DEPLOYED" : "INITIALIZATION IN PROGRESS"}
-                      </h4>
-                      <p style={{ color: "var(--text-dim)", fontSize: "14px", marginBottom: "24px", maxWidth: "450px", margin: "0 auto 24px" }}>
-                        {myRequests[0]?.status === 'approved' 
-                          ? "Your strategy has been approved! The AI Agent is currently generating your campaigns. They will appear here shortly." 
-                          : "Your AI Marketing Agent is currently reviewing your business parameters. You will be notified once the strategy is approved and deployed by our team."}
-                      </p>
-                      <div style={{ display: "inline-block", padding: "8px 16px", background: "var(--black3)", border: "1px solid var(--border)", borderRadius: "20px", fontSize: "12px", color: "var(--text-dimmer)" }}>
-                        STATUS: <span style={{ color: myRequests[0]?.status === 'approved' ? "var(--neon-green)" : "var(--orange)", fontWeight: 700 }}>
-                          {myRequests[0]?.status === 'approved' ? "APPROVED - BUILDING CAMPAIGNS" : "PENDING ADMIN REVIEW"}
-                        </span>
-                      </div>
+              {/* ADMIN REJECTION NOTIFICATION */}
+              {myRequests.length > 0 && myRequests[0]?.status === 'needs_clarification' && (
+                <div style={{ padding: "24px", borderRadius: "16px", background: "rgba(255,0,110,0.1)", border: "1px solid var(--neon-pink)" }}>
+                  <h3 style={{ color: "var(--neon-pink)", fontWeight: 700, marginBottom: "8px" }}>⚠️ ACTION REQUIRED: Admin Requested Clarification</h3>
+                  <p style={{ fontSize: "14px", color: "white", marginBottom: "16px" }}>" {myRequests[0]?.adminFeedback} "</p>
+                  <button className="btn-primary" onClick={() => setActiveTab("deploy")} style={{ padding: "10px 20px", fontSize: "13px", borderRadius: "8px" }}>EDIT & RESUBMIT BRIEF</button>
+                </div>
+              )}
+
+              {/* STANDARD STATUS */}
+              {myRequests.length > 0 && myRequests[0]?.status === 'pending_admin_review' && (
+                <div className="card-hover" style={{ padding: "40px", borderRadius: "16px", background: "var(--card)", textAlign: "center" }}>
+                   <div style={{ fontSize: "40px", marginBottom: "16px" }}>⏳</div>
+                   <h4 style={{ fontSize: "20px", fontFamily: "'Bebas Neue'", letterSpacing: "0.05em", color: "var(--orange)" }}>INITIALIZATION IN PROGRESS</h4>
+                   <p style={{ color: "var(--text-dim)", fontSize: "14px" }}>Your AI Marketing Agent is reviewing your parameters. Awaiting Admin verification.</p>
+                </div>
+              )}
+              {myRequests.length > 0 && myRequests[0]?.status === 'approved' && (
+                <div className="card-hover" style={{ padding: "40px", borderRadius: "16px", background: "var(--card)", textAlign: "center" }}>
+                   <div style={{ fontSize: "40px", marginBottom: "16px" }}>🚀</div>
+                   <h4 style={{ fontSize: "20px", fontFamily: "'Bebas Neue'", letterSpacing: "0.05em", color: "var(--neon-green)" }}>AI AGENT DEPLOYED</h4>
+                   <p style={{ color: "var(--text-dim)", fontSize: "14px" }}>Your strategy has been approved! The AI is managing your campaigns.</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* DEPLOY AGENT TAB (The New Intake Workflow) */}
+          {activeTab === "deploy" && (
+            <div style={{ maxWidth: "900px" }}>
+              <div style={{ marginBottom: "32px" }}>
+                <h2 style={{ fontSize: "20px", fontWeight: 700, marginBottom: "8px" }}>Step 1: Select Your Protocol</h2>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "16px" }}>
+                  {pricingTiers.map(tier => (
+                    <div key={tier.name} 
+                      onClick={() => setIntakeData({...intakeData, selectedTier: tier.name})}
+                      className="card-hover" 
+                      style={{ padding: "24px", borderRadius: "12px", cursor: "pointer", border: intakeData.selectedTier === tier.name ? "2px solid var(--orange)" : "1px solid var(--border)", background: intakeData.selectedTier === tier.name ? "rgba(255,85,0,0.05)" : "var(--card)" }}>
+                      <div style={{ fontSize: "14px", fontWeight: 700, fontFamily: "'JetBrains Mono'", color: intakeData.selectedTier === tier.name ? "var(--orange)" : "white" }}>{tier.name}</div>
+                      <div style={{ fontSize: "32px", fontFamily: "'Bebas Neue'", margin: "12px 0" }}>${tier.price}</div>
+                      <ul style={{ padding: 0, margin: 0, listStyle: "none", fontSize: "12px", color: "var(--text-dim)" }}>
+                        {tier.features.map(f => <li key={f} style={{ marginBottom: "6px" }}>✓ {f}</li>)}
+                      </ul>
                     </div>
-                  ) : (
-                    <div style={{ textAlign: "center", padding: "60px 20px" }}>
-                      <div style={{ fontSize: "40px", marginBottom: "16px" }}>⚡</div>
-                      <h4 style={{ fontSize: "20px", marginBottom: "8px", fontFamily: "'Bebas Neue'", letterSpacing: "0.05em" }}>NO CAMPAIGNS DETECTED</h4>
-                      <p style={{ color: "var(--text-dim)", fontSize: "14px", marginBottom: "24px", maxWidth: "400px", margin: "0 auto 24px" }}>
-                        Your AI Marketing Agent is standing by. Provide your business requirements to initialize your custom strategy.
-                      </p>
-                      <button className="btn-primary" onClick={() => setShowIntakeForm(true)} style={{ padding: "16px 32px", borderRadius: "8px", fontSize: "14px" }}>
-                        INITIALIZE AI AGENT →
-                      </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="card-hover" style={{ background: "var(--card)", padding: "40px", borderRadius: "16px", border: "1px solid var(--border)" }}>
+                <h2 style={{ fontSize: "20px", fontWeight: 700, marginBottom: "24px" }}>Step 2: AI Agent Briefing</h2>
+                <form onSubmit={handleProceedToCheckout} style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                    <div>
+                      <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Primary Goal *</label>
+                      <select required value={intakeData.primaryGoal} onChange={e => setIntakeData({...intakeData, primaryGoal: e.target.value})} style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "var(--black)", color: "white", border: "1px solid var(--border)" }}>
+                        {availableGoals.map(g => <option key={g} value={g}>{g}</option>)}
+                      </select>
                     </div>
-                  )
-                ) : (
-                  <div style={{ color: "var(--neon-green)", textAlign: "center", padding: "40px" }}>{campaigns.length} Active Campaigns Running Globally</div>
-                )}
+                    <div>
+                      <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Monthly Ad Budget ($) *</label>
+                      <input type="number" required placeholder="e.g. 5000" value={intakeData.monthlyBudget} onChange={e => setIntakeData({...intakeData, monthlyBudget: e.target.value})} style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "var(--black)", color: "white", border: "1px solid var(--border)" }} />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Target Audience Profile *</label>
+                    <textarea required placeholder="e.g. Local homeowners aged 30-55..." value={intakeData.targetAudience} onChange={e => setIntakeData({...intakeData, targetAudience: e.target.value})} style={{ width: "100%", padding: "12px", borderRadius: "8px", minHeight: "80px", resize: "vertical", background: "var(--black)", color: "white", border: "1px solid var(--border)" }} />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "10px" }}>Preferred Channels *</label>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                      {availableChannels.map(channel => (
+                        <div key={channel} onClick={() => {
+                            const newChannels = intakeData.channels.includes(channel) ? intakeData.channels.filter(c => c !== channel) : [...intakeData.channels, channel];
+                            setIntakeData({...intakeData, channels: newChannels});
+                          }}
+                          style={{ padding: "8px 16px", borderRadius: "20px", fontSize: "12px", cursor: "pointer", background: intakeData.channels.includes(channel) ? "var(--orange)" : "var(--black3)", color: intakeData.channels.includes(channel) ? "white" : "var(--text-dim)", border: `1px solid ${intakeData.channels.includes(channel) ? "var(--orange)" : "var(--border)"}` }}>
+                          {channel}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <button type="submit" className="btn-primary" style={{ padding: "16px", borderRadius: "8px", fontSize: "15px", marginTop: "12px" }}>
+                    PROCEED TO CHECKOUT
+                  </button>
+                </form>
               </div>
             </div>
           )}
@@ -235,13 +333,12 @@ export default function ClientDashboard() {
               {campaigns.length === 0 ? <div style={{ padding: "40px", textAlign: "center", color: "var(--text-dimmer)" }}>Waiting for Admin to deploy AI campaigns.</div> : (
                 <table>
                   <thead>
-                    <tr><th>Campaign</th><th>Channel</th><th>Status</th><th>Spend</th><th>Leads Generated</th></tr>
+                    <tr><th>Campaign</th><th>Status</th><th>Spend</th><th>Leads</th></tr>
                   </thead>
                   <tbody>
                     {campaigns.map(c => (
                       <tr key={c.id}>
                         <td style={{ fontWeight: 600 }}>{c.name}</td>
-                        <td><span style={{ fontSize: "12px", color: "var(--text-dim)", fontFamily: "'JetBrains Mono'" }}>{c.channel || "Google Ads"}</span></td>
                         <td><span className={`tag status-live`}>LIVE</span></td>
                         <td style={{ fontFamily: "'JetBrains Mono'" }}>${c.spend}</td>
                         <td style={{ fontFamily: "'JetBrains Mono'", color: "var(--neon-green)" }}>{c.leads}</td>
@@ -257,14 +354,12 @@ export default function ClientDashboard() {
           {activeTab === "analytics" && (
             <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
                <h3 style={{ fontWeight: 700, fontSize: "18px" }}>Campaign Performance Analytics</h3>
-               
                {campaigns.length === 0 ? (
                  <div style={{ padding: "40px", textAlign: "center", background: "var(--card)", borderRadius: "16px", border: "1px dashed var(--border)", color: "var(--text-dimmer)" }}>
                    Waiting for AI Agent to deploy campaigns to generate analytics.
                  </div>
                ) : (
                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
-                   {/* Leads Bar Chart */}
                    <div className="card-hover" style={{ background: "var(--card)", padding: "32px", borderRadius: "16px", border: "1px solid var(--border)" }}>
                      <h4 style={{ fontSize: "14px", color: "var(--text-dimmer)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "24px" }}>Leads by Campaign</h4>
                      <div style={{ display: "flex", gap: "16px", alignItems: "flex-end", height: "250px" }}>
@@ -281,7 +376,6 @@ export default function ClientDashboard() {
                      </div>
                    </div>
 
-                   {/* Spend Bar Chart */}
                    <div className="card-hover" style={{ background: "var(--card)", padding: "32px", borderRadius: "16px", border: "1px solid var(--border)" }}>
                      <h4 style={{ fontSize: "14px", color: "var(--text-dimmer)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "24px" }}>Ad Spend Allocation</h4>
                      <div style={{ display: "flex", gap: "16px", alignItems: "flex-end", height: "250px" }}>
@@ -302,6 +396,36 @@ export default function ClientDashboard() {
             </div>
           )}
 
+          {/* ASSETS TAB (FULLY FUNCTIONAL FILE UPLOAD) */}
+          {activeTab === "assets" && (
+            <div style={{ maxWidth: "800px" }}>
+              <div className="card-hover" style={{ padding: "40px", borderRadius: "16px", background: "var(--card)", border: "1px dashed var(--border)", textAlign: "center", marginBottom: "24px" }}>
+                <div style={{ fontSize: "40px", marginBottom: "16px" }}>📁</div>
+                <h3 style={{ fontSize: "18px", fontWeight: 700, marginBottom: "8px" }}>Upload Brand Assets</h3>
+                <p style={{ color: "var(--text-dim)", fontSize: "14px", marginBottom: "24px" }}>Upload your Logos, Brand Guidelines (PDF), and past Ad Creatives here.</p>
+                
+                {uploadProgress > 0 && uploadProgress < 100 ? (
+                  <div style={{ color: "var(--orange)", fontWeight: 700 }}>Uploading... {uploadProgress}%</div>
+                ) : (
+                  <>
+                    <input type="file" id="file-upload" hidden onChange={handleAssetUpload} />
+                    <label htmlFor="file-upload" className="btn-primary" style={{ padding: "12px 24px", borderRadius: "8px", cursor: "pointer", display: "inline-block" }}>SELECT FILES</label>
+                  </>
+                )}
+              </div>
+
+              {/* Display previously uploaded assets */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                {myAssets.map(asset => (
+                   <div key={asset.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px", background: "var(--black3)", borderRadius: "8px", border: "1px solid var(--border)" }}>
+                     <span style={{ fontSize: "13px", fontWeight: 600 }}>{asset.name}</span>
+                     <a href={asset.url} target="_blank" rel="noopener noreferrer" style={{ color: "var(--orange)", fontSize: "12px", textDecoration: "none" }}>Download ↓</a>
+                   </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* TASKS TAB */}
           {activeTab === "tasks" && (
             <div>
@@ -318,7 +442,6 @@ export default function ClientDashboard() {
                           <div style={{ fontSize: "13px", fontWeight: 600 }}>{task.title}</div>
                         </div>
                       ))}
-                      {tasks.filter(t => t.status === status).length === 0 && <div style={{ fontSize: "12px", color: "var(--text-dimmer)", textAlign: "center", padding: "10px" }}>Empty</div>}
                     </div>
                   </div>
                 ))}
@@ -334,132 +457,75 @@ export default function ClientDashboard() {
                   {chatHistory.length === 0 ? <div style={{ margin: "auto", color: "var(--text-dimmer)" }}>Start a conversation with our team...</div> : (
                     chatHistory.map((m, i) => (
                       <div key={i} style={{ display: "flex", flexDirection: m.type === "user" ? "row-reverse" : "row", gap: "12px", alignItems: "flex-start" }}>
-                        <div style={{ padding: "12px 16px", borderRadius: m.type === "user" ? "16px 4px 16px 16px" : "4px 16px 16px 16px", background: m.type === "user" ? "var(--orange)" : "var(--black3)", fontSize: "14px" }}>
-                          {m.msg}
-                        </div>
+                        <div style={{ padding: "12px 16px", borderRadius: m.type === "user" ? "16px 4px 16px 16px" : "4px 16px 16px 16px", background: m.type === "user" ? "var(--orange)" : "var(--black3)", fontSize: "14px" }}>{m.msg}</div>
                       </div>
                     ))
                   )}
                 </div>
                 <div style={{ padding: "16px 24px", borderTop: "1px solid var(--border)", display: "flex", gap: "12px" }}>
-                  <input value={chatMsg} onChange={e => setChatMsg(e.target.value)} onKeyDown={e => e.key === "Enter" && sendMessage()} placeholder="Type your message..." style={{ flex: 1, padding: "12px 16px", borderRadius: "10px", fontSize: "14px" }} />
+                  <input value={chatMsg} onChange={e => setChatMsg(e.target.value)} onKeyDown={e => e.key === "Enter" && sendMessage()} placeholder="Type your message..." style={{ flex: 1, padding: "12px 16px", borderRadius: "10px", fontSize: "14px", background: "var(--black)", border: "1px solid var(--border)", color: "white" }} />
                   <button className="btn-primary" onClick={sendMessage} style={{ padding: "12px 24px", borderRadius: "10px", fontSize: "14px" }}>SEND</button>
                 </div>
               </div>
             </div>
           )}
 
-          {/* PROFILE TAB */}
+          {/* PROFILE TAB (EXPANDED & WIRED) */}
           {activeTab === "profile" && (
-            <div className="card-hover" style={{ padding: "32px", borderRadius: "16px", background: "var(--card)", maxWidth: "600px" }}>
-              <h3 style={{ fontWeight: 700, marginBottom: "24px" }}>Company Profile</h3>
-              <div style={{ padding: "16px", background: "rgba(255,85,0,0.1)", border: "1px solid rgba(255,85,0,0.3)", borderRadius: "12px", marginBottom: "24px" }}>
-                <div style={{ fontSize: "11px", color: "var(--orange)", textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: "'JetBrains Mono'", marginBottom: "4px" }}>Active Subscription Tier</div>
-                <div style={{ fontSize: "24px", fontFamily: "'Bebas Neue'", color: "white" }}>{clientData?.plan || "Awaiting Setup"}</div>
-              </div>
-              <div style={{ marginBottom: "16px" }}>
-                <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: "'JetBrains Mono'", display: "block", marginBottom: "6px" }}>Company Name</label>
-                <input readOnly value={currentUser?.displayName || ""} style={{ width: "100%", padding: "10px 14px", borderRadius: "8px", fontSize: "14px", background: "var(--black3)", border: "1px solid var(--border)", color: "var(--text-dim)" }} />
+            <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "24px", maxWidth: "700px" }}>
+              <div className="card-hover" style={{ padding: "32px", borderRadius: "16px", background: "var(--card)" }}>
+                <h3 style={{ fontWeight: 700, marginBottom: "24px" }}>Company Profile</h3>
+                
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" }}>
+                  <div>
+                    <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Company Name</label>
+                    <input value={profileForm.companyName} onChange={e => setProfileForm({...profileForm, companyName: e.target.value})} style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "var(--black3)", border: "1px solid var(--border)", color: "white" }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Industry</label>
+                    <input value={profileForm.industry} onChange={e => setProfileForm({...profileForm, industry: e.target.value})} placeholder="e.g. Real Estate" style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "var(--black3)", border: "1px solid var(--border)", color: "white" }} />
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" }}>
+                  <div>
+                    <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Email Address</label>
+                    <input value={profileForm.email} readOnly style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "var(--black2)", border: "1px solid var(--border)", color: "var(--text-dimmer)" }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Phone Number</label>
+                    <input value={profileForm.phone} onChange={e => setProfileForm({...profileForm, phone: e.target.value})} style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "var(--black3)", border: "1px solid var(--border)", color: "white" }} />
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: "24px" }}>
+                  <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Company Website</label>
+                  <input value={profileForm.website} onChange={e => setProfileForm({...profileForm, website: e.target.value})} placeholder="https://" style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "var(--black3)", border: "1px solid var(--border)", color: "white" }} />
+                </div>
+
+                <button className="btn-primary" onClick={handleSaveProfile} style={{ padding: "12px 24px", borderRadius: "8px", fontSize: "13px" }}>SAVE PROFILE DATA</button>
               </div>
             </div>
           )}
+
         </div>
       </div>
 
-      {/* THE AI INTAKE MODAL (Full form restored) */}
-      {showIntakeForm && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(10px)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", overflow: "auto", padding: "40px 20px" }}>
-          <div className="card-hover" style={{ background: "var(--black2)", padding: "40px", borderRadius: "16px", maxWidth: "600px", width: "100%", position: "relative", maxHeight: "90vh", overflowY: "auto" }}>
+      {/* SECURE CHECKOUT MODAL (Mocked for Now - Replaces Stripe Redirection) */}
+      {showCheckout && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.9)", backdropFilter: "blur(10px)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div className="card-hover" style={{ background: "var(--card)", padding: "40px", borderRadius: "16px", maxWidth: "400px", width: "100%", border: "1px solid var(--orange)" }}>
+            <h2 style={{ fontFamily: "'Bebas Neue'", fontSize: "32px", color: "white", marginBottom: "8px" }}>SECURE CHECKOUT</h2>
+            <p style={{ color: "var(--text-dim)", fontSize: "14px", marginBottom: "24px" }}>You are subscribing to the <strong style={{ color: "var(--orange)" }}>{intakeData.selectedTier}</strong> Protocol.</p>
             
-            <button onClick={() => setShowIntakeForm(false)} style={{ position: "absolute", top: "20px", right: "24px", background: "transparent", border: "none", color: "var(--text-dimmer)", fontSize: "24px", cursor: "pointer" }}>×</button>
-            
-            <h2 style={{ fontFamily: "'Bebas Neue'", fontSize: "32px", marginBottom: "8px", color: "var(--orange)" }}>AI AGENT BRIEFING</h2>
-            <p style={{ fontSize: "13px", color: "var(--text-dim)", marginBottom: "32px" }}>Help our AI understand your business context.</p>
-            
-            <form onSubmit={submitIntakeForm} style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-              
-              <div>
-                <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Business URL (Optional)</label>
-                <input 
-                  type="url" 
-                  placeholder="https://... (Leave blank if not applicable)" 
-                  value={intakeData.businessUrl}
-                  onChange={e => setIntakeData({...intakeData, businessUrl: e.target.value})}
-                  style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "var(--black)", color: "white", border: "1px solid var(--border)" }} 
-                />
-              </div>
+            <div style={{ padding: "16px", background: "var(--black)", borderRadius: "8px", border: "1px solid var(--border)", marginBottom: "24px", color: "var(--text-dimmer)", fontSize: "12px", textAlign: "center" }}>
+              [ BILLING GATEWAY PAUSED FOR MVP ]
+            </div>
 
-              <div>
-                <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Target Audience Profile *</label>
-                <textarea 
-                  required
-                  placeholder="e.g. Local homeowners aged 30-55..." 
-                  value={intakeData.targetAudience}
-                  onChange={e => setIntakeData({...intakeData, targetAudience: e.target.value})}
-                  style={{ width: "100%", padding: "12px", borderRadius: "8px", minHeight: "80px", resize: "vertical", background: "var(--black)", color: "white", border: "1px solid var(--border)" }} 
-                />
-              </div>
-
-              <div>
-                <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Monthly Ad Budget ($) *</label>
-                <input 
-                  type="number" required placeholder="e.g. 5000" 
-                  value={intakeData.monthlyBudget}
-                  onChange={e => setIntakeData({...intakeData, monthlyBudget: e.target.value})}
-                  style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "var(--black)", color: "white", border: "1px solid var(--border)" }} 
-                />
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-                <div>
-                  <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Primary Goal *</label>
-                  <select 
-                    value={intakeData.primaryGoal}
-                    onChange={e => setIntakeData({...intakeData, primaryGoal: e.target.value})}
-                    style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "var(--black)", color: "white", border: "1px solid var(--border)" }}>
-                    {availableGoals.map(g => <option key={`pri-${g}`} value={g}>{g}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Secondary Goal</label>
-                  <select 
-                    value={intakeData.secondaryGoal}
-                    onChange={e => setIntakeData({...intakeData, secondaryGoal: e.target.value})}
-                    style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "var(--black)", color: "white", border: "1px solid var(--border)" }}>
-                    {availableGoals.map(g => <option key={`sec-${g}`} value={g}>{g}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "10px" }}>Preferred Channels *</label>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-                  {availableChannels.map(channel => (
-                    <div 
-                      key={channel}
-                      onClick={() => {
-                        const isSelected = intakeData.channels.includes(channel);
-                        const newChannels = isSelected 
-                          ? intakeData.channels.filter(c => c !== channel) 
-                          : [...intakeData.channels, channel];
-                        setIntakeData({...intakeData, channels: newChannels});
-                      }}
-                      style={{ 
-                        padding: "8px 16px", borderRadius: "20px", fontSize: "12px", cursor: "pointer", transition: "all 0.2s",
-                        background: intakeData.channels.includes(channel) ? "var(--orange)" : "var(--black3)",
-                        color: intakeData.channels.includes(channel) ? "white" : "var(--text-dim)",
-                        border: `1px solid ${intakeData.channels.includes(channel) ? "var(--orange)" : "var(--border)"}`
-                      }}>
-                      {channel}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <button type="submit" className="btn-primary" disabled={intakeData.channels.length === 0} style={{ padding: "16px", borderRadius: "8px", fontSize: "15px", marginTop: "12px", opacity: intakeData.channels.length === 0 ? 0.5 : 1 }}>
-                SUBMIT FOR AI ANALYSIS
-              </button>
-            </form>
+            <div style={{ display: "flex", gap: "12px" }}>
+              <button className="btn-ghost" onClick={() => setShowCheckout(false)} style={{ flex: 1, padding: "12px", borderRadius: "8px" }}>CANCEL</button>
+              <button className="btn-primary" onClick={processPaymentAndSubmit} style={{ flex: 2, padding: "12px", borderRadius: "8px" }}>SUBMIT BRIEF FOR REVIEW</button>
+            </div>
           </div>
         </div>
       )}

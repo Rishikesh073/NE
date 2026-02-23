@@ -1,6 +1,8 @@
 // src/services/firebase.js
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAnxfR5DRsF4Zo_EGot4qy57VtepcH_emE",
@@ -11,11 +13,14 @@ const firebaseConfig = {
   appId: "1:106829693223:web:e532b90041cbc0e9e52902"
 };
 
+// Initialize Firebase App
 const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const googleProvider = new GoogleAuthProvider();
 
+// Initialize & Export Core Services
+export const auth = getAuth(app);
+export const db = getFirestore(app);
+export const storage = getStorage(app);
 
-// THIS LINE IS CRITICAL
-export { auth, googleProvider, signInWithPopup, signOut };
-
+// Setup & Export Google Auth Provider
+export const googleProvider = new GoogleAuthProvider();
+export { signInWithPopup, signOut };

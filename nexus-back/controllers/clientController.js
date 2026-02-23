@@ -22,6 +22,29 @@ const getClients = async (req, res) => {
   }
 };
 
+// Add this below your existing getClients / createClient functions
+const updateClientProfile = async (req, res) => {
+  try {
+    const { uid } = req.params;
+    const profileData = req.body;
+
+    const clientsRef = db.collection('clients');
+    const snapshot = await clientsRef.where('uid', '==', uid).get();
+    
+    if (!snapshot.empty) {
+      await snapshot.docs[0].ref.update(profileData);
+      res.status(200).json({ message: 'Profile Updated Successfully' });
+    } else {
+      res.status(404).json({ error: 'Client not found' });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Make sure to export it at the bottom:
+// module.exports = { getClients, createClient, updateClientProfile };
+
 // Create a new client
 const createClient = async (req, res) => {
   try {
@@ -33,4 +56,4 @@ const createClient = async (req, res) => {
   }
 };
 
-module.exports = { getClients, createClient };
+module.exports = { getClients, createClient, updateClientProfile };

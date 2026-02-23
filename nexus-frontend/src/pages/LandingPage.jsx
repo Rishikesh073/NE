@@ -1,9 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-// DELETED: import Nav from "../components/Nav"; 
 import Ticker from "../components/Ticker";
 import AnimatedCounter from "../components/AnimatedCounter";
-import { services, testimonials } from "../utils/mockData";
+import { testimonials } from "../utils/mockData";
 
 export default function LandingPage() {
   const navigate = useNavigate();
@@ -26,6 +25,14 @@ export default function LandingPage() {
     }
   ];
 
+  // NEW: Clear, concise explanation of your core services
+  const coreServices = [
+    { icon: "🎯", title: "Meta & Google Ads", desc: "Autonomous ad buying, A/B testing, and budget scaling across Facebook, Instagram, and Google Networks.", color: "var(--neon-blue)" },
+    { icon: "🤖", title: "Custom AI Models", desc: "Proprietary machine learning algorithms trained specifically on your business data to predict and capture high-value leads.", color: "var(--orange)" },
+    { icon: "📈", title: "Real-Time Analytics", desc: "Live dashboards tracking every dollar spent and every lead generated. Complete transparency, zero guesswork.", color: "var(--neon-green)" },
+    { icon: "✉️", title: "Smart Email Automation", desc: "Behavior-triggered follow-up sequences that automatically nurture and convert cold leads into booked calls.", color: "var(--neon-pink)" }
+  ];
+
   useEffect(() => {
     const t = setInterval(() => setTestimonialIdx(i => (i + 1) % testimonials.length), 4000);
     return () => clearInterval(t);
@@ -46,8 +53,6 @@ export default function LandingPage() {
 
   return (
     <div>
-      {/* DELETED THE <Nav /> TAG FROM HERE */}
-      
       {/* Hero */}
       <div className="grid-bg" style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "100px 40px 80px", position: "relative", overflow: "hidden" }}>
         
@@ -64,7 +69,6 @@ export default function LandingPage() {
           </div>
         </nav>
 
-        {/* Cursor glow */}
         <div style={{
           position: "fixed", pointerEvents: "none", zIndex: 0,
           left: mousePos.x - 200, top: mousePos.y - 200,
@@ -115,27 +119,31 @@ export default function LandingPage() {
 
       <Ticker />
 
-      {/* Services Grid */}
+      {/* Services Grid (UPDATED) */}
       <section id="services" style={{ padding: "120px 60px", maxWidth: "1200px", margin: "0 auto" }}>
         <div style={{ textAlign: "center", marginBottom: "80px" }}>
           <p className="tag status-live" style={{ marginBottom: "20px", display: "inline-block" }}>OUR ARSENAL</p>
           <h2 style={{ fontFamily: "'Bebas Neue', cursive", fontSize: "72px", lineHeight: 1, letterSpacing: "0.02em" }}>
-            EVERY CHANNEL.<br /><span className="neon-text-orange">EVERY PLATFORM.</span>
+            WHAT WE <span className="neon-text-orange">PROVIDE.</span>
           </h2>
+          <p style={{ color: "var(--text-dim)", fontSize: "18px", maxWidth: "600px", margin: "16px auto 0" }}>
+            We don't just run ads. We deploy autonomous systems designed to scale your revenue.
+          </p>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "20px" }}>
-          {services.map((s, i) => (
-            <div key={i} className="card-hover" style={{ padding: "32px", borderRadius: "16px", background: "var(--card)", cursor: "default", animation: `slide-up 0.5s ease ${i * 0.08}s both` }}>
-              <div style={{ fontSize: "36px", marginBottom: "16px", filter: `drop-shadow(0 0 10px ${s.color})` }}>{s.icon}</div>
-              <div style={{ fontFamily: "'Bebas Neue', cursive", fontSize: "28px", color: s.color, letterSpacing: "0.05em", marginBottom: "8px" }}>{s.label}</div>
-              <div style={{ fontSize: "13px", color: "var(--text-dimmer)", lineHeight: 1.6 }}>AI-optimized campaigns with real-time performance tracking and automated scaling.</div>
+        
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "24px" }}>
+          {coreServices.map((s, i) => (
+            <div key={i} className="card-hover" style={{ padding: "32px", borderRadius: "16px", background: "var(--card)", border: "1px solid var(--border)", animation: `slide-up 0.5s ease ${i * 0.08}s both` }}>
+              <div style={{ fontSize: "40px", marginBottom: "20px", filter: `drop-shadow(0 0 10px ${s.color}66)` }}>{s.icon}</div>
+              <h3 style={{ fontFamily: "'Bebas Neue', cursive", fontSize: "28px", color: "white", letterSpacing: "0.05em", marginBottom: "12px" }}>{s.title}</h3>
+              <p style={{ fontSize: "14px", color: "var(--text-dim)", lineHeight: 1.6 }}>{s.desc}</p>
             </div>
           ))}
         </div>
       </section>
 
       {/* Pricing */}
-      <section id="pricing" style={{ padding: "120px 60px" }}>
+      <section id="pricing" style={{ padding: "120px 60px", background: "var(--black2)", borderTop: "1px solid var(--border)" }}>
         <div style={{ textAlign: "center", marginBottom: "80px" }}>
           <h2 style={{ fontFamily: "'Bebas Neue', cursive", fontSize: "72px", letterSpacing: "0.02em" }}>
             TRANSPARENT PRICING
@@ -147,7 +155,7 @@ export default function LandingPage() {
             <div key={i} className="card-hover" onMouseEnter={() => setPricingHover(i)} onMouseLeave={() => setPricingHover(null)}
               style={{
                 padding: "40px", borderRadius: "20px",
-                background: plan.featured ? `linear-gradient(135deg, rgba(255,85,0,0.1), rgba(255,122,0,0.05))` : "var(--card)",
+                background: plan.featured ? `linear-gradient(135deg, rgba(255,85,0,0.1), rgba(255,122,0,0.05))` : "var(--black)",
                 border: `1px solid ${plan.featured ? "var(--orange)" : "var(--border)"}`,
                 position: "relative", overflow: "hidden",
                 transform: plan.featured ? "scale(1.04)" : "scale(1)",
@@ -178,7 +186,7 @@ export default function LandingPage() {
       </section>
 
       {/* CTA */}
-      <section style={{ padding: "120px 60px", textAlign: "center", background: "var(--black2)", position: "relative", overflow: "hidden" }}>
+      <section style={{ padding: "120px 60px", textAlign: "center", position: "relative", overflow: "hidden" }}>
         <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse 60% 80% at 50% 100%, rgba(255,85,0,0.1) 0%, transparent 60%)" }} />
         <div style={{ position: "relative" }}>
           <h2 style={{ fontFamily: "'Bebas Neue', cursive", fontSize: "80px", letterSpacing: "0.02em", marginBottom: "24px" }}>
@@ -191,25 +199,15 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <footer style={{ padding: "60px", borderTop: "1px solid var(--border)" }}>
+      <footer style={{ padding: "60px", borderTop: "1px solid var(--border)", background: "var(--black2)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "20px" }}>
-          
-          {/* THE SECRET DOOR: Double click this text to go to admin portal */}
           <div 
             onDoubleClick={() => navigate("/admin-login")}
             style={{ fontFamily: "'Bebas Neue', cursive", fontSize: "28px", letterSpacing: "0.1em", cursor: "pointer", userSelect: "none" }}
           >
             NEXUS
           </div>
-          
           <div style={{ color: "var(--text-dimmer)", fontSize: "13px" }}>© 2024 NEXUS AI Agency. All rights reserved.</div>
-          <div style={{ display: "flex", gap: "24px" }}>
-            {["Privacy", "Terms", "Contact"].map(item => (
-              <span key={item} style={{ color: "var(--text-dimmer)", fontSize: "13px", cursor: "pointer", transition: "color 0.2s" }}
-                onMouseEnter={e => e.target.style.color = "var(--orange)"}
-                onMouseLeave={e => e.target.style.color = "var(--text-dimmer)"}>{item}</span>
-            ))}
-          </div>
         </div>
       </footer>
     </div>
