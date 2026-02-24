@@ -19,13 +19,15 @@ export default function ClientDashboard() {
   const [myAssets, setMyAssets] = useState([]); 
   const [loading, setLoading] = useState(true);
   
-  // CLOUDINARY UPLOAD STATE
+  // CLOUDINARY UPLOAD & ASSET MANAGEMENT STATES
   const [uploadStatus, setUploadStatus] = useState(""); 
+  const [assetSearch, setAssetSearch] = useState("");
+  const [assetFilter, setAssetFilter] = useState("ALL");
 
   // PROFILE STATE
   const [profileForm, setProfileForm] = useState({ companyName: "", contactName: "", email: "", phone: "", industry: "", website: "" });
 
-// --- NEW: COMPREHENSIVE AI INTAKE ARRAYS ---
+  // --- COMPREHENSIVE AI INTAKE ARRAYS ---
   const availableDomains = [
     "Technology & SaaS", "E-commerce & Retail", "Healthcare & Medical", 
     "Real Estate & Property", "Finance & Insurance", "Education & E-Learning", 
@@ -33,14 +35,11 @@ export default function ClientDashboard() {
     "Travel & Tourism", "Manufacturing & Logistics", "Other"
   ];
 
-const availableTypes = [
+  const availableTypes = [
     "B2B (Business to Business)", "B2C (Business to Consumer)", 
     "D2C (Direct to Consumer)", "E-commerce Store", 
     "Local Service Provider", "SaaS / Digital Product", "Agency / Consulting"
   ];
-
-
-
 
   // INTAKE FORM STATES
   const [showCheckout, setShowCheckout] = useState(false);
@@ -53,7 +52,6 @@ const availableTypes = [
     monthlyBudget: "",
     primaryGoal: "Lead Generation", 
     channels: [],
-    // New AI Context Fields
     geography: "",
     usp: "",
     competitors: "",
@@ -74,6 +72,10 @@ const availableTypes = [
     "GROWTH": ["Up to 3 Active AI Campaigns", "Meta + Google Ads Network", "Advanced Lead Analytics Dashboard", "Priority Support Chat"],
     "ENTERPRISE": ["Unlimited AI Campaigns", "Full Omnichannel Deployment", "Custom AI Audience Models", "Dedicated Slack Channel"]
   };
+
+  // --- HIGH VISIBILITY FORM STYLES ---
+  const labelStyle = { fontSize: "12px", color: "#b0b0b0", textTransform: "uppercase", display: "block", marginBottom: "8px", fontWeight: 700, letterSpacing: "0.05em" };
+  const inputStyle = { width: "100%", padding: "14px", borderRadius: "8px", background: "var(--black)", color: "#ffffff", border: "1px solid rgba(255, 255, 255, 0.15)", fontSize: "15px", fontWeight: 500, outline: "none", fontFamily: "inherit" };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -159,7 +161,6 @@ const availableTypes = [
     try { await api.post('/messages', newMsg); } catch (e) {}
   };
 
-  // --- SECURE CLOUDINARY API UPLOAD ---
   const handleAssetUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -175,16 +176,40 @@ const availableTypes = [
       const res = await api.post('/assets', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
-      
-      setMyAssets([...myAssets, res.data]);
+      setMyAssets([res.data, ...myAssets]); // Prepend to show at the top
       setUploadStatus("");
-      alert("Asset uploaded successfully!");
     } catch (error) {
       console.error(error);
       setUploadStatus("");
       alert("Failed to upload asset. Check server logs.");
     }
   };
+
+  // --- NEW: DELETE ASSET LOGIC ---
+  const handleDeleteAsset = async (assetId) => {
+    if (!window.confirm("Are you sure you want to delete this file? This cannot be undone.")) return;
+    
+    try {
+      await api.delete(`/assets/${assetId}`);
+      setMyAssets(myAssets.filter(a => a.id !== assetId));
+    } catch (error) {
+      alert("Failed to delete asset. Check server connection.");
+    }
+  };
+
+  // --- NEW: SEARCH & FILTER LOGIC ---
+  const displayedAssets = myAssets.filter(asset => {
+    const searchMatch = asset.name.toLowerCase().includes(assetSearch.toLowerCase());
+    let filterMatch = true;
+    
+    if (assetFilter === "IMAGES") {
+      filterMatch = asset.name.match(/\.(jpeg|jpg|gif|png|svg|webp)$/i);
+    } else if (assetFilter === "DOCUMENTS") {
+      filterMatch = asset.name.match(/\.(pdf|doc|docx|txt|csv|xls|xlsx)$/i);
+    }
+    
+    return searchMatch && filterMatch;
+  });
 
   const totalSpend = campaigns.reduce((sum, c) => sum + (Number(c.spend) || 0), 0);
   const totalLeads = campaigns.reduce((sum, c) => sum + (Number(c.leads) || 0), 0);
@@ -296,7 +321,6 @@ const availableTypes = [
                             <p style={{ color: "var(--text-dim)", fontSize: "14px" }}>Your AI Marketing Agent is reviewing your parameters. Awaiting Admin verification.</p>
                           </div>
 
-                          {/* DYNAMIC AI ROADMAP RESTORED */}
                           <div style={{ background: "var(--black2)", padding: "24px", borderRadius: "12px", border: "1px solid var(--border)", textAlign: "left" }}>
                             <h5 style={{ fontFamily: "'Bebas Neue'", fontSize: "18px", color: "white", marginBottom: "20px", letterSpacing: "0.05em" }}>PROPOSED ACTION ROADMAP</h5>
                             <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
@@ -355,11 +379,11 @@ const availableTypes = [
                     <div key={tier.name} 
                       onClick={() => setIntakeData({...intakeData, selectedTier: tier.name})}
                       className="card-hover" 
-                      style={{ padding: "24px", borderRadius: "12px", cursor: "pointer", border: intakeData.selectedTier === tier.name ? "2px solid var(--orange)" : "1px solid var(--border)", background: intakeData.selectedTier === tier.name ? "rgba(255,85,0,0.05)" : "var(--card)" }}>
+                      style={{ padding: "24px", borderRadius: "12px", cursor: "pointer", border: intakeData.selectedTier === tier.name ? "2px solid var(--orange)" : "1px solid rgba(255,255,255,0.1)", background: intakeData.selectedTier === tier.name ? "rgba(255,85,0,0.08)" : "var(--card)" }}>
                       <div style={{ fontSize: "14px", fontWeight: 700, fontFamily: "'JetBrains Mono'", color: intakeData.selectedTier === tier.name ? "var(--orange)" : "white" }}>{tier.name}</div>
                       <div style={{ fontSize: "32px", fontFamily: "'Bebas Neue'", margin: "12px 0" }}>${tier.price}</div>
-                      <ul style={{ padding: 0, margin: 0, listStyle: "none", fontSize: "12px", color: "var(--text-dim)" }}>
-                        {tier.features.map(f => <li key={f} style={{ marginBottom: "6px" }}>✓ {f}</li>)}
+                      <ul style={{ padding: 0, margin: 0, listStyle: "none", fontSize: "13px", color: "var(--text-dim)" }}>
+                        {tier.features.map(f => <li key={f} style={{ marginBottom: "8px" }}>✓ {f}</li>)}
                       </ul>
                     </div>
                   ))}
@@ -367,96 +391,86 @@ const availableTypes = [
               </div>
 
               <div className="card-hover" style={{ background: "var(--card)", padding: "40px", borderRadius: "16px", border: "1px solid var(--border)" }}>
-                <h2 style={{ fontSize: "20px", fontWeight: 700, marginBottom: "24px" }}>Step 2: AI Agent Briefing</h2>
-                <form onSubmit={handleProceedToCheckout} style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-
-{/* Row 1: Domain & Type */}
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                <h2 style={{ fontSize: "20px", fontWeight: 700, marginBottom: "32px" }}>Step 2: AI Agent Briefing</h2>
+                
+                <form onSubmit={handleProceedToCheckout} style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+                  
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
                     <div>
-                      <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Business Domain *</label>
-                      <select required value={intakeData.businessDomain} onChange={e => setIntakeData({...intakeData, businessDomain: e.target.value})} style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "var(--black)", color: "white", border: "1px solid var(--border)" }}>
+                      <label style={labelStyle}>Business Domain *</label>
+                      <select required value={intakeData.businessDomain} onChange={e => setIntakeData({...intakeData, businessDomain: e.target.value})} style={inputStyle}>
                         {availableDomains.map(d => <option key={d} value={d}>{d}</option>)}
                       </select>
                     </div>
                     <div>
-                      <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Business Type *</label>
-                      <select required value={intakeData.businessType} onChange={e => setIntakeData({...intakeData, businessType: e.target.value})} style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "var(--black)", color: "white", border: "1px solid var(--border)" }}>
+                      <label style={labelStyle}>Business Type *</label>
+                      <select required value={intakeData.businessType} onChange={e => setIntakeData({...intakeData, businessType: e.target.value})} style={inputStyle}>
                         {availableTypes.map(t => <option key={t} value={t}>{t}</option>)}
                       </select>
                     </div>
                   </div>
 
-{/* Row 2: Budget & Goals */}
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
                     <div>
-                      <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Primary Goal *</label>
-                      <select required value={intakeData.primaryGoal} onChange={e => setIntakeData({...intakeData, primaryGoal: e.target.value})} style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "var(--black)", color: "white", border: "1px solid var(--border)" }}>{availableGoals.map(g => <option key={g} value={g}>{g}</option>)}</select>
-                    </div>
-                    <div>
-                      <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Monthly Ad Budget ($) *</label>
-                      <input type="number" required placeholder="e.g. 5000" value={intakeData.monthlyBudget} onChange={e => setIntakeData({...intakeData, monthlyBudget: e.target.value})} style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "var(--black)", color: "white", border: "1px solid var(--border)" }} />
-                    </div>
-                  </div>
-
-{/* Row 3: URL & Geography */}
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-                    <div>
-                      <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Business URL (Optional)</label>
-                      <input type="url" placeholder="https://" value={intakeData.businessUrl} onChange={e => setIntakeData({...intakeData, businessUrl: e.target.value})} style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "var(--black)", color: "white", border: "1px solid var(--border)" }} />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Target Geography *</label>
-                      <input type="text" required placeholder="e.g. Nationwide, or Miami FL" value={intakeData.geography} onChange={e => setIntakeData({...intakeData, geography: e.target.value})} style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "var(--black)", color: "white", border: "1px solid var(--border)" }} />
-                    </div>
-                  </div>
-
-                  {/* Text Areas for Context */}
-                  <div>
-                    <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Target Audience Profile *</label>
-                    <textarea required placeholder="Describe your ideal customer (Age, interests, pain points)..." value={intakeData.targetAudience} onChange={e => setIntakeData({...intakeData, targetAudience: e.target.value})} style={{ width: "100%", padding: "12px", borderRadius: "8px", minHeight: "80px", resize: "vertical", background: "var(--black)", color: "white", border: "1px solid var(--border)" }} />
-                  </div>
-
-                  <div>
-                    <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Unique Selling Proposition (USP) *</label>
-                    <textarea required placeholder="Why should customers choose you over competitors? What makes you unique?" value={intakeData.usp} onChange={e => setIntakeData({...intakeData, usp: e.target.value})} style={{ width: "100%", padding: "12px", borderRadius: "8px", minHeight: "80px", resize: "vertical", background: "var(--black)", color: "white", border: "1px solid var(--border)" }} />
-                  </div>
-
-
-
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-                    <div>
-                      <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Primary Goal *</label>
-                      <select required value={intakeData.primaryGoal} onChange={e => setIntakeData({...intakeData, primaryGoal: e.target.value})} style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "var(--black)", color: "white", border: "1px solid var(--border)" }}>
+                      <label style={labelStyle}>Primary Goal *</label>
+                      <select required value={intakeData.primaryGoal} onChange={e => setIntakeData({...intakeData, primaryGoal: e.target.value})} style={inputStyle}>
                         {availableGoals.map(g => <option key={g} value={g}>{g}</option>)}
                       </select>
                     </div>
                     <div>
-                      <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Monthly Ad Budget ($) *</label>
-                      <input type="number" required placeholder="e.g. 5000" value={intakeData.monthlyBudget} onChange={e => setIntakeData({...intakeData, monthlyBudget: e.target.value})} style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "var(--black)", color: "white", border: "1px solid var(--border)" }} />
+                      <label style={labelStyle}>Monthly Ad Budget ($) *</label>
+                      <input type="number" required placeholder="e.g. 5000" value={intakeData.monthlyBudget} onChange={e => setIntakeData({...intakeData, monthlyBudget: e.target.value})} style={inputStyle} />
                     </div>
                   </div>
                   
-                  <div>
-                    <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Target Audience Profile *</label>
-                    <textarea required placeholder="e.g. Local homeowners aged 30-55..." value={intakeData.targetAudience} onChange={e => setIntakeData({...intakeData, targetAudience: e.target.value})} style={{ width: "100%", padding: "12px", borderRadius: "8px", minHeight: "80px", resize: "vertical", background: "var(--black)", color: "white", border: "1px solid var(--border)" }} />
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
+                    <div>
+                      <label style={labelStyle}>Business URL (Optional)</label>
+                      <input type="url" placeholder="https://" value={intakeData.businessUrl} onChange={e => setIntakeData({...intakeData, businessUrl: e.target.value})} style={inputStyle} />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Target Geography *</label>
+                      <input type="text" required placeholder="e.g. Nationwide, or Miami FL" value={intakeData.geography} onChange={e => setIntakeData({...intakeData, geography: e.target.value})} style={inputStyle} />
+                    </div>
                   </div>
 
                   <div>
-                    <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "10px" }}>Preferred Channels *</label>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-                      {availableChannels.map(channel => (
-                        <div key={channel} onClick={() => {
-                            const newChannels = intakeData.channels.includes(channel) ? intakeData.channels.filter(c => c !== channel) : [...intakeData.channels, channel];
-                            setIntakeData({...intakeData, channels: newChannels});
-                          }}
-                          style={{ padding: "8px 16px", borderRadius: "20px", fontSize: "12px", cursor: "pointer", background: intakeData.channels.includes(channel) ? "var(--orange)" : "var(--black3)", color: intakeData.channels.includes(channel) ? "white" : "var(--text-dim)", border: `1px solid ${intakeData.channels.includes(channel) ? "var(--orange)" : "var(--border)"}` }}>
-                          {channel}
-                        </div>
-                      ))}
+                    <label style={labelStyle}>Target Audience Profile *</label>
+                    <textarea required placeholder="Describe your ideal customer (Age, interests, pain points)..." value={intakeData.targetAudience} onChange={e => setIntakeData({...intakeData, targetAudience: e.target.value})} style={{ ...inputStyle, minHeight: "100px", resize: "vertical" }} />
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Unique Selling Proposition (USP) *</label>
+                    <textarea required placeholder="Why should customers choose you over competitors? What makes you unique?" value={intakeData.usp} onChange={e => setIntakeData({...intakeData, usp: e.target.value})} style={{ ...inputStyle, minHeight: "100px", resize: "vertical" }} />
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
+                    <div>
+                      <label style={labelStyle}>Main Competitors</label>
+                      <textarea placeholder="List 2-3 competitor URLs or names..." value={intakeData.competitors} onChange={e => setIntakeData({...intakeData, competitors: e.target.value})} style={{ ...inputStyle, minHeight: "80px", resize: "vertical" }} />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Current Offers / Lead Magnets</label>
+                      <textarea placeholder="e.g. 20% off first order, Free PDF guide..." value={intakeData.offers} onChange={e => setIntakeData({...intakeData, offers: e.target.value})} style={{ ...inputStyle, minHeight: "80px", resize: "vertical" }} />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Preferred Channels *</label>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "12px" }}>
+                      {availableChannels.map(channel => {
+                        const isSelected = intakeData.channels.includes(channel);
+                        return (
+                          <div key={channel} onClick={() => { setIntakeData({...intakeData, channels: isSelected ? intakeData.channels.filter(c => c !== channel) : [...intakeData.channels, channel]}); }}
+                            style={{ padding: "10px 20px", borderRadius: "20px", fontSize: "14px", fontWeight: 600, cursor: "pointer", background: isSelected ? "var(--orange)" : "var(--black3)", color: isSelected ? "white" : "#a0a0a0", border: `1px solid ${isSelected ? "var(--orange)" : "rgba(255,255,255,0.1)"}`, transition: "all 0.2s ease" }}>
+                            {channel}
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
                   
-                  <button type="submit" className="btn-primary" style={{ padding: "16px", borderRadius: "8px", fontSize: "15px", marginTop: "12px" }}>
+                  <button type="submit" className="btn-primary" style={{ padding: "18px", borderRadius: "10px", fontSize: "16px", fontWeight: 700, marginTop: "12px", letterSpacing: "0.05em" }}>
                     PROCEED TO CHECKOUT
                   </button>
                 </form>
@@ -533,10 +547,10 @@ const availableTypes = [
             </div>
           )}
 
-          {/* ASSETS TAB (WITH CLOUDINARY LOGIC) */}
+          {/* ASSETS TAB (WITH SEARCH, FILTER, AND DELETE) */}
           {activeTab === "assets" && (
             <div style={{ maxWidth: "800px" }}>
-              <div className="card-hover" style={{ padding: "40px", borderRadius: "16px", background: "var(--card)", border: "1px dashed var(--border)", textAlign: "center", marginBottom: "24px" }}>
+              <div className="card-hover" style={{ padding: "40px", borderRadius: "16px", background: "var(--card)", border: "1px dashed var(--border)", textAlign: "center", marginBottom: "32px" }}>
                 <div style={{ fontSize: "40px", marginBottom: "16px" }}>📁</div>
                 <h3 style={{ fontSize: "18px", fontWeight: 700, marginBottom: "8px" }}>Upload Brand Assets</h3>
                 <p style={{ color: "var(--text-dim)", fontSize: "14px", marginBottom: "24px" }}>Upload your Logos, Brand Guidelines (PDF), and past Ad Creatives here.</p>
@@ -551,14 +565,41 @@ const availableTypes = [
                 )}
               </div>
 
-              {/* Display previously uploaded assets */}
+              {/* Advanced Search & Filter Controls */}
+              <div style={{ display: "flex", gap: "16px", marginBottom: "24px" }}>
+                <input 
+                  type="text" 
+                  placeholder="🔍 Search files by name..." 
+                  value={assetSearch} 
+                  onChange={(e) => setAssetSearch(e.target.value)} 
+                  style={{ ...inputStyle, flex: 2, padding: "12px 16px" }} 
+                />
+                <select 
+                  value={assetFilter} 
+                  onChange={(e) => setAssetFilter(e.target.value)} 
+                  style={{ ...inputStyle, flex: 1, padding: "12px 16px" }}
+                >
+                  <option value="ALL">All Files</option>
+                  <option value="IMAGES">Images Only</option>
+                  <option value="DOCUMENTS">Documents & PDFs</option>
+                </select>
+              </div>
+
+              {/* Dynamic File List */}
               <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                {myAssets.map(asset => (
-                   <div key={asset.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px", background: "var(--black3)", borderRadius: "8px", border: "1px solid var(--border)" }}>
-                     <span style={{ fontSize: "13px", fontWeight: 600 }}>{asset.name}</span>
-                     <a href={asset.url} target="_blank" rel="noopener noreferrer" style={{ color: "var(--orange)", fontSize: "12px", textDecoration: "none" }}>Download ↓</a>
-                   </div>
-                ))}
+                {displayedAssets.length === 0 ? (
+                  <div style={{ textAlign: "center", padding: "32px", color: "var(--text-dimmer)" }}>No assets match your search.</div>
+                ) : (
+                  displayedAssets.map(asset => (
+                     <div key={asset.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px", background: "var(--black3)", borderRadius: "8px", border: "1px solid var(--border)" }}>
+                       <span style={{ fontSize: "14px", fontWeight: 600, color: "white" }}>{asset.name}</span>
+                       <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
+                         <a href={asset.url} target="_blank" rel="noopener noreferrer" style={{ color: "var(--neon-blue)", fontSize: "13px", textDecoration: "none", fontWeight: 700 }}>DOWNLOAD ↓</a>
+                         <button onClick={() => handleDeleteAsset(asset.id)} style={{ background: "transparent", border: "none", color: "var(--neon-pink)", fontSize: "13px", cursor: "pointer", fontWeight: 700 }}>DELETE ✕</button>
+                       </div>
+                     </div>
+                  ))
+                )}
               </div>
             </div>
           )}
@@ -599,64 +640,64 @@ const availableTypes = [
                     ))
                   )}
                 </div>
-                <div style={{ padding: "16px 24px", borderTop: "1px solid var(--border)", display: "flex", gap: "12px" }}>
-                  <input value={chatMsg} onChange={e => setChatMsg(e.target.value)} onKeyDown={e => e.key === "Enter" && sendMessage()} placeholder="Type your message..." style={{ flex: 1, padding: "12px 16px", borderRadius: "10px", fontSize: "14px", background: "var(--black)", border: "1px solid var(--border)", color: "white" }} />
-                  <button className="btn-primary" onClick={sendMessage} style={{ padding: "12px 24px", borderRadius: "10px", fontSize: "14px" }}>SEND</button>
+                <div style={{ padding: "16px", borderTop: "1px solid var(--border)", display: "flex", gap: "12px", background: "var(--black2)" }}>
+                  <input value={chatMsg} onChange={e => setChatMsg(e.target.value)} onKeyDown={e => e.key === "Enter" && sendMessage()} placeholder="Type your message..." style={{ ...inputStyle, padding: "12px 16px", background: "var(--black)" }} />
+                  <button className="btn-primary" onClick={sendMessage} style={{ padding: "12px 24px", borderRadius: "10px", fontSize: "14px", fontWeight: 700 }}>SEND</button>
                 </div>
               </div>
             </div>
           )}
 
-          {/* PROFILE TAB (RESTORED SERVICE PROTOCOL) */}
+          {/* PROFILE TAB */}
           {activeTab === "profile" && (
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
               
               <div className="card-hover" style={{ padding: "32px", borderRadius: "16px", background: "var(--card)" }}>
-                <h3 style={{ fontWeight: 700, marginBottom: "24px" }}>Company Profile</h3>
+                <h3 style={{ fontWeight: 700, marginBottom: "24px", fontSize: "20px" }}>Company Profile</h3>
                 
-                <div style={{ marginBottom: "16px" }}>
-                  <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Company Name</label>
-                  <input value={profileForm.companyName} onChange={e => setProfileForm({...profileForm, companyName: e.target.value})} style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "var(--black3)", border: "1px solid var(--border)", color: "white" }} />
+                <div style={{ marginBottom: "20px" }}>
+                  <label style={labelStyle}>Company Name</label>
+                  <input value={profileForm.companyName} onChange={e => setProfileForm({...profileForm, companyName: e.target.value})} style={inputStyle} />
                 </div>
                 
-                <div style={{ marginBottom: "16px" }}>
-                  <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Industry</label>
-                  <input value={profileForm.industry} onChange={e => setProfileForm({...profileForm, industry: e.target.value})} placeholder="e.g. Real Estate" style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "var(--black3)", border: "1px solid var(--border)", color: "white" }} />
+                <div style={{ marginBottom: "20px" }}>
+                  <label style={labelStyle}>Industry</label>
+                  <input value={profileForm.industry} onChange={e => setProfileForm({...profileForm, industry: e.target.value})} placeholder="e.g. Real Estate" style={inputStyle} />
                 </div>
 
-                <div style={{ marginBottom: "16px" }}>
-                  <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Email Address</label>
-                  <input value={profileForm.email} readOnly style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "var(--black2)", border: "1px solid var(--border)", color: "var(--text-dimmer)" }} />
+                <div style={{ marginBottom: "20px" }}>
+                  <label style={labelStyle}>Email Address</label>
+                  <input value={profileForm.email} readOnly style={{ ...inputStyle, background: "rgba(255,255,255,0.03)", color: "#888", cursor: "not-allowed" }} />
                 </div>
 
-                <div style={{ marginBottom: "16px" }}>
-                  <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Phone Number</label>
-                  <input value={profileForm.phone} onChange={e => setProfileForm({...profileForm, phone: e.target.value})} style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "var(--black3)", border: "1px solid var(--border)", color: "white" }} />
+                <div style={{ marginBottom: "20px" }}>
+                  <label style={labelStyle}>Phone Number</label>
+                  <input value={profileForm.phone} onChange={e => setProfileForm({...profileForm, phone: e.target.value})} style={inputStyle} />
                 </div>
 
-                <div style={{ marginBottom: "24px" }}>
-                  <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Company Website</label>
-                  <input value={profileForm.website} onChange={e => setProfileForm({...profileForm, website: e.target.value})} placeholder="https://" style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "var(--black3)", border: "1px solid var(--border)", color: "white" }} />
+                <div style={{ marginBottom: "28px" }}>
+                  <label style={labelStyle}>Company Website</label>
+                  <input value={profileForm.website} onChange={e => setProfileForm({...profileForm, website: e.target.value})} placeholder="https://" style={inputStyle} />
                 </div>
 
-                <button className="btn-primary" onClick={handleSaveProfile} style={{ padding: "12px 24px", borderRadius: "8px", fontSize: "13px" }}>SAVE PROFILE DATA</button>
+                <button className="btn-primary" onClick={handleSaveProfile} style={{ padding: "14px 28px", borderRadius: "8px", fontSize: "14px", fontWeight: 700 }}>SAVE PROFILE DATA</button>
               </div>
 
               {/* Service Protocol Details */}
-              <div className="card-hover" style={{ padding: "32px", borderRadius: "16px", background: "var(--card)" }}>
-                <h3 style={{ fontWeight: 700, marginBottom: "24px" }}>Your Service Protocol</h3>
+              <div className="card-hover" style={{ padding: "32px", borderRadius: "16px", background: "var(--card)", height: "fit-content" }}>
+                <h3 style={{ fontWeight: 700, marginBottom: "24px", fontSize: "20px" }}>Your Service Protocol</h3>
                 <div style={{ padding: "16px", background: "rgba(255,85,0,0.1)", border: "1px solid rgba(255,85,0,0.3)", borderRadius: "12px", marginBottom: "24px" }}>
-                  <div style={{ fontSize: "11px", color: "var(--orange)", textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: "'JetBrains Mono'", marginBottom: "4px" }}>Active Subscription Tier</div>
+                  <div style={{ fontSize: "11px", color: "var(--orange)", textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: "'JetBrains Mono'", marginBottom: "4px", fontWeight: 700 }}>Active Subscription Tier</div>
                   <div style={{ fontSize: "24px", fontFamily: "'Bebas Neue'", color: "white" }}>{clientData?.plan || "PENDING SETUP"}</div>
                 </div>
                 
                 <div>
-                  <h4 style={{ fontSize: "12px", color: "var(--text-dimmer)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "16px" }}>Included Capabilities</h4>
+                  <h4 style={{ fontSize: "12px", color: "var(--text-dimmer)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "16px", fontWeight: 700 }}>Included Capabilities</h4>
                   <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "12px" }}>
                     {tierServices[clientData?.plan?.toUpperCase()] ? (
                       tierServices[clientData?.plan?.toUpperCase()].map((service, i) => (
-                        <li key={i} style={{ fontSize: "13px", color: "var(--text)", display: "flex", alignItems: "center", gap: "12px" }}>
-                          <div style={{ width: "16px", height: "16px", borderRadius: "50%", background: "rgba(0,255,148,0.1)", color: "var(--neon-green)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px" }}>✓</div>
+                        <li key={i} style={{ fontSize: "14px", color: "var(--text)", display: "flex", alignItems: "center", gap: "12px" }}>
+                          <div style={{ width: "18px", height: "18px", borderRadius: "50%", background: "rgba(0,255,148,0.1)", color: "var(--neon-green)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: 700 }}>✓</div>
                           {service}
                         </li>
                       ))
@@ -680,13 +721,13 @@ const availableTypes = [
             <h2 style={{ fontFamily: "'Bebas Neue'", fontSize: "32px", color: "white", marginBottom: "8px" }}>SECURE CHECKOUT</h2>
             <p style={{ color: "var(--text-dim)", fontSize: "14px", marginBottom: "24px" }}>You are subscribing to the <strong style={{ color: "var(--orange)" }}>{intakeData.selectedTier}</strong> Protocol.</p>
             
-            <div style={{ padding: "16px", background: "var(--black)", borderRadius: "8px", border: "1px solid var(--border)", marginBottom: "24px", color: "var(--text-dimmer)", fontSize: "12px", textAlign: "center" }}>
+            <div style={{ padding: "16px", background: "var(--black)", borderRadius: "8px", border: "1px solid var(--border)", marginBottom: "24px", color: "var(--text-dimmer)", fontSize: "12px", textAlign: "center", fontWeight: 600 }}>
               [ BILLING GATEWAY PAUSED FOR MVP ]
             </div>
 
             <div style={{ display: "flex", gap: "12px" }}>
-              <button className="btn-ghost" onClick={() => setShowCheckout(false)} style={{ flex: 1, padding: "12px", borderRadius: "8px" }}>CANCEL</button>
-              <button className="btn-primary" onClick={processPaymentAndSubmit} style={{ flex: 2, padding: "12px", borderRadius: "8px" }}>SUBMIT BRIEF</button>
+              <button className="btn-ghost" onClick={() => setShowCheckout(false)} style={{ flex: 1, padding: "12px", borderRadius: "8px", fontWeight: 600 }}>CANCEL</button>
+              <button className="btn-primary" onClick={processPaymentAndSubmit} style={{ flex: 2, padding: "12px", borderRadius: "8px", fontWeight: 700 }}>SUBMIT BRIEF</button>
             </div>
           </div>
         </div>

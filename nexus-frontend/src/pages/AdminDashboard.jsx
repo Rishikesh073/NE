@@ -323,25 +323,33 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* NEW ASSETS TAB (Admin View) */}
+{/* NEW ASSETS TAB (Admin View) */}
           {activeTab === "assets" && (
             <div className="card-hover" style={{ borderRadius: "16px", background: "var(--card)", overflow: "hidden" }}>
               {assets.length === 0 ? <div style={{ padding: "40px", textAlign: "center" }}>No client assets uploaded yet.</div> : (
                 <table>
-                  <thead><tr><th>Client ID</th><th>File Name</th><th>Action</th></tr></thead>
+                  <thead><tr><th>Client Name</th><th>File Name</th><th>Action</th></tr></thead>
                   <tbody>
-                    {assets.map(a => (
-                      <tr key={a.id}>
-                        <td style={{ color: "var(--orange)", fontSize: "12px" }}>{a.clientId}</td>
-                        <td style={{ fontWeight: 600 }}>{a.name}</td>
-                        <td><a href={a.url} target="_blank" rel="noreferrer" className="btn-ghost" style={{ padding: "6px 12px", borderRadius: "6px", fontSize: "11px", textDecoration: "none" }}>DOWNLOAD</a></td>
-                      </tr>
-                    ))}
+                    {assets.map(a => {
+                      // Find the client name that matches the ID
+                      const owner = clients.find(c => c.uid === a.clientId);
+                      return (
+                        <tr key={a.id}>
+                          <td>
+                            <div style={{ fontWeight: 700, fontSize: "14px", color: "var(--orange)" }}>{owner ? owner.name : "Unknown Client"}</div>
+                            <div style={{ fontSize: "10px", color: "var(--text-dimmer)" }}>ID: {a.clientId.substring(0, 8)}...</div>
+                          </td>
+                          <td style={{ fontWeight: 600 }}>{a.name}</td>
+                          <td><a href={a.url} target="_blank" rel="noreferrer" className="btn-ghost" style={{ padding: "6px 12px", borderRadius: "6px", fontSize: "11px", textDecoration: "none" }}>DOWNLOAD</a></td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               )}
             </div>
           )}
+
 
           {/* TASKS TAB (Now with Task Assignment features) */}
           {activeTab === "tasks" && (
