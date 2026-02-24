@@ -16,7 +16,7 @@ const {
   rejectServiceRequest // Added reject function
 } = require('../controllers/serviceRequestController'); 
 
-const { saveAsset, getAssets } = require('../controllers/assetController');
+const { saveAsset, getAssets, upload } = require('../controllers/assetController');
 
 // --- ROUTES ---
 
@@ -47,6 +47,6 @@ router.put('/service-requests/:id/reject', rejectServiceRequest); // <-- NEW: Ad
 
 // NEW: Assets Routes
 router.get('/assets', getAssets);
-router.post('/assets', saveAsset);
+router.post('/assets', upload, saveAsset);
 
 module.exports = router;

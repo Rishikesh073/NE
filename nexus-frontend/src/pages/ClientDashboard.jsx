@@ -2,9 +2,6 @@ import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import api from "../services/api"; 
 import { useAuth } from "../contexts/AuthContext";
-// NEW FIREBASE STORAGE IMPORTS
-import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
-import { storage } from "../services/firebase";
 
 export default function ClientDashboard() {
   const navigate = useNavigate();
@@ -19,19 +16,48 @@ export default function ClientDashboard() {
   const [chatHistory, setChatHistory] = useState([]);
   const [chatMsg, setChatMsg] = useState("");
   const [myRequests, setMyRequests] = useState([]); 
-  const [myAssets, setMyAssets] = useState([]); // <-- ASSETS STATE
+  const [myAssets, setMyAssets] = useState([]); 
   const [loading, setLoading] = useState(true);
-  const [uploadProgress, setUploadProgress] = useState(0); // <-- PROGRESS STATE
+  
+  // CLOUDINARY UPLOAD STATE
+  const [uploadStatus, setUploadStatus] = useState(""); 
 
   // PROFILE STATE
   const [profileForm, setProfileForm] = useState({ companyName: "", contactName: "", email: "", phone: "", industry: "", website: "" });
 
-  // INTAKE FORM & CHECKOUT STATES
+// --- NEW: COMPREHENSIVE AI INTAKE ARRAYS ---
+  const availableDomains = [
+    "Technology & SaaS", "E-commerce & Retail", "Healthcare & Medical", 
+    "Real Estate & Property", "Finance & Insurance", "Education & E-Learning", 
+    "Home Services & Trades", "Restaurant & Hospitality", "Legal Services", 
+    "Travel & Tourism", "Manufacturing & Logistics", "Other"
+  ];
+
+const availableTypes = [
+    "B2B (Business to Business)", "B2C (Business to Consumer)", 
+    "D2C (Direct to Consumer)", "E-commerce Store", 
+    "Local Service Provider", "SaaS / Digital Product", "Agency / Consulting"
+  ];
+
+
+
+
+  // INTAKE FORM STATES
   const [showCheckout, setShowCheckout] = useState(false);
   const [intakeData, setIntakeData] = useState({
-    selectedTier: "GROWTH", // Default selection
-    businessUrl: "", targetAudience: "", monthlyBudget: "",
-    primaryGoal: "Lead Generation", secondaryGoal: "Brand Awareness", channels: []
+    selectedTier: "GROWTH",
+    businessDomain: "Technology & SaaS",
+    businessType: "B2B (Business to Business)",
+    businessUrl: "", 
+    targetAudience: "", 
+    monthlyBudget: "",
+    primaryGoal: "Lead Generation", 
+    channels: [],
+    // New AI Context Fields
+    geography: "",
+    usp: "",
+    competitors: "",
+    offers: ""
   });
 
   const availableGoals = ["Lead Generation", "Direct E-commerce Sales", "Brand Awareness", "Website Traffic", "App Installs"];
@@ -42,6 +68,12 @@ export default function ClientDashboard() {
     { name: "GROWTH", price: 299, desc: "For scaling operations.", features: ["3 AI Campaigns", "Meta + Google Ads"] },
     { name: "ENTERPRISE", price: 499, desc: "Full autonomous takeover.", features: ["Unlimited Campaigns", "Omnichannel"] }
   ];
+
+  const tierServices = {
+    "STARTER": ["1 Active AI Campaign", "Meta Ads Network Optimization", "Basic Lead Gen Analytics", "Email Support Access"],
+    "GROWTH": ["Up to 3 Active AI Campaigns", "Meta + Google Ads Network", "Advanced Lead Analytics Dashboard", "Priority Support Chat"],
+    "ENTERPRISE": ["Unlimited AI Campaigns", "Full Omnichannel Deployment", "Custom AI Audience Models", "Dedicated Slack Channel"]
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -57,7 +89,7 @@ export default function ClientDashboard() {
         setMyRequests(reqRes.data.filter(r => r.clientId === currentUser.uid));
         setTasks(taskRes.data.filter(t => t.clientId === currentUser.uid));
         setChatHistory(msgRes.data.filter(m => m.clientId === currentUser.uid || m.to === currentUser.uid));
-        setMyAssets(assetRes.data.filter(a => a.clientId === currentUser.uid)); // <-- Fetch isolated assets
+        setMyAssets(assetRes.data.filter(a => a.clientId === currentUser.uid)); 
         
         const myProfile = clientsRes.data.find(c => c.uid === currentUser.uid);
         if (myProfile) {
@@ -106,7 +138,7 @@ export default function ClientDashboard() {
       setActiveTab("overview");
       const reqRes = await api.get('/service-requests').catch(() => ({ data: [] }));
       setMyRequests(reqRes.data.filter(r => r.clientId === currentUser?.uid));
-      alert("Payment Successful! AI Agent Brief submitted to Admin.");
+      alert("AI Agent Brief submitted to Admin.");
     } catch (error) { alert("Error submitting request."); }
   };
 
@@ -127,30 +159,31 @@ export default function ClientDashboard() {
     try { await api.post('/messages', newMsg); } catch (e) {}
   };
 
-  // --- REAL FIREBASE ASSET UPLOAD LOGIC ---
-  const handleAssetUpload = (e) => {
+  // --- SECURE CLOUDINARY API UPLOAD ---
+  const handleAssetUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
     
-    // Create a reference in Firebase Storage
-    const storageRef = ref(storage, `client_assets/${currentUser.uid}_${Date.now()}_${file.name}`);
-    const uploadTask = uploadBytesResumable(storageRef, file);
+    setUploadStatus("Uploading to secure cloud...");
 
-    // Track upload progress
-    uploadTask.on('state_changed', 
-      (snapshot) => setUploadProgress(Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100)),
-      (error) => { console.error(error); alert("Upload failed!"); setUploadProgress(0); },
-      async () => {
-        // Get the URL and save to Express Backend
-        const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-        const newAsset = { clientId: currentUser.uid, name: file.name, url: downloadURL, type: file.type };
-        try {
-          const res = await api.post('/assets', newAsset);
-          setMyAssets([...myAssets, { id: res.data.id, ...newAsset }]);
-          setUploadProgress(0);
-        } catch (err) { alert("Failed to save asset record."); setUploadProgress(0); }
-      }
-    );
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("clientId", currentUser.uid);
+    formData.append("fileName", file.name);
+
+    try {
+      const res = await api.post('/assets', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      
+      setMyAssets([...myAssets, res.data]);
+      setUploadStatus("");
+      alert("Asset uploaded successfully!");
+    } catch (error) {
+      console.error(error);
+      setUploadStatus("");
+      alert("Failed to upload asset. Check server logs.");
+    }
   };
 
   const totalSpend = campaigns.reduce((sum, c) => sum + (Number(c.spend) || 0), 0);
@@ -235,7 +268,6 @@ export default function ClientDashboard() {
                 </div>
               </div>
 
-              {/* ADMIN REJECTION NOTIFICATION */}
               {myRequests.length > 0 && myRequests[0]?.status === 'needs_clarification' && (
                 <div style={{ padding: "24px", borderRadius: "16px", background: "rgba(255,0,110,0.1)", border: "1px solid var(--neon-pink)" }}>
                   <h3 style={{ color: "var(--neon-pink)", fontWeight: 700, marginBottom: "8px" }}>⚠️ ACTION REQUIRED: Admin Requested Clarification</h3>
@@ -244,25 +276,76 @@ export default function ClientDashboard() {
                 </div>
               )}
 
-              {/* STANDARD STATUS */}
-              {myRequests.length > 0 && myRequests[0]?.status === 'pending_admin_review' && (
-                <div className="card-hover" style={{ padding: "40px", borderRadius: "16px", background: "var(--card)", textAlign: "center" }}>
-                   <div style={{ fontSize: "40px", marginBottom: "16px" }}>⏳</div>
-                   <h4 style={{ fontSize: "20px", fontFamily: "'Bebas Neue'", letterSpacing: "0.05em", color: "var(--orange)" }}>INITIALIZATION IN PROGRESS</h4>
-                   <p style={{ color: "var(--text-dim)", fontSize: "14px" }}>Your AI Marketing Agent is reviewing your parameters. Awaiting Admin verification.</p>
-                </div>
-              )}
-              {myRequests.length > 0 && myRequests[0]?.status === 'approved' && (
-                <div className="card-hover" style={{ padding: "40px", borderRadius: "16px", background: "var(--card)", textAlign: "center" }}>
-                   <div style={{ fontSize: "40px", marginBottom: "16px" }}>🚀</div>
-                   <h4 style={{ fontSize: "20px", fontFamily: "'Bebas Neue'", letterSpacing: "0.05em", color: "var(--neon-green)" }}>AI AGENT DEPLOYED</h4>
-                   <p style={{ color: "var(--text-dim)", fontSize: "14px" }}>Your strategy has been approved! The AI is managing your campaigns.</p>
-                </div>
-              )}
+              <div className="card-hover" style={{ padding: "28px", borderRadius: "16px", background: "var(--card)", marginTop: "16px" }}>
+                <h3 style={{ fontWeight: 700, fontSize: "16px", marginBottom: "24px" }}>System Status</h3>
+                
+                {campaigns.length === 0 ? (
+                  myRequests.length > 0 ? (
+                    <div style={{ padding: "20px" }}>
+                      {myRequests[0]?.status === 'approved' ? (
+                        <div style={{ textAlign: "center", padding: "40px" }}>
+                          <div style={{ fontSize: "40px", marginBottom: "16px", color: "var(--neon-green)" }}>🚀</div>
+                          <h4 style={{ fontSize: "20px", marginBottom: "8px", fontFamily: "'Bebas Neue'", letterSpacing: "0.05em", color: "var(--neon-green)" }}>AI AGENT DEPLOYED</h4>
+                          <p style={{ color: "var(--text-dim)", fontSize: "14px", marginBottom: "24px", maxWidth: "450px", margin: "0 auto" }}>Your strategy has been approved! The AI Agent is currently generating your campaigns. They will appear here shortly.</p>
+                        </div>
+                      ) : (
+                        <div style={{ maxWidth: "600px", margin: "0 auto" }}>
+                          <div style={{ textAlign: "center", marginBottom: "40px" }}>
+                            <div style={{ fontSize: "40px", marginBottom: "16px", color: "var(--orange)" }}>⏳</div>
+                            <h4 style={{ fontSize: "20px", marginBottom: "8px", fontFamily: "'Bebas Neue'", letterSpacing: "0.05em", color: "var(--orange)" }}>INITIALIZATION IN PROGRESS</h4>
+                            <p style={{ color: "var(--text-dim)", fontSize: "14px" }}>Your AI Marketing Agent is reviewing your parameters. Awaiting Admin verification.</p>
+                          </div>
+
+                          {/* DYNAMIC AI ROADMAP RESTORED */}
+                          <div style={{ background: "var(--black2)", padding: "24px", borderRadius: "12px", border: "1px solid var(--border)", textAlign: "left" }}>
+                            <h5 style={{ fontFamily: "'Bebas Neue'", fontSize: "18px", color: "white", marginBottom: "20px", letterSpacing: "0.05em" }}>PROPOSED ACTION ROADMAP</h5>
+                            <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+                              <div style={{ display: "flex", gap: "16px" }}>
+                                <div style={{ width: "28px", height: "28px", borderRadius: "50%", background: "rgba(255,85,0,0.2)", color: "var(--orange)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "13px", fontWeight: "bold", flexShrink: 0 }}>1</div>
+                                <div>
+                                  <div style={{ fontSize: "14px", fontWeight: 600, color: "white" }}>Audience Analysis</div>
+                                  <div style={{ fontSize: "12px", color: "var(--text-dim)", marginTop: "4px", lineHeight: 1.5 }}>Structuring targeting parameters for: <span style={{ color: "var(--text-dimmer)" }}>"{myRequests[0].requirements.targetAudience.substring(0, 60)}..."</span></div>
+                                </div>
+                              </div>
+                              <div style={{ display: "flex", gap: "16px" }}>
+                                <div style={{ width: "28px", height: "28px", borderRadius: "50%", background: "rgba(255,85,0,0.2)", color: "var(--orange)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "13px", fontWeight: "bold", flexShrink: 0 }}>2</div>
+                                <div>
+                                  <div style={{ fontSize: "14px", fontWeight: 600, color: "white" }}>Channel Integration</div>
+                                  <div style={{ fontSize: "12px", color: "var(--text-dim)", marginTop: "4px", lineHeight: 1.5 }}>Setting up automated bidding pipelines for <span style={{ color: "var(--orange)" }}>{myRequests[0].requirements.channels.join(", ")}</span>.</div>
+                                </div>
+                              </div>
+                              <div style={{ display: "flex", gap: "16px" }}>
+                                <div style={{ width: "28px", height: "28px", borderRadius: "50%", background: "rgba(255,85,0,0.2)", color: "var(--orange)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "13px", fontWeight: "bold", flexShrink: 0 }}>3</div>
+                                <div>
+                                  <div style={{ fontSize: "14px", fontWeight: 600, color: "white" }}>Budget & Goal Optimization</div>
+                                  <div style={{ fontSize: "12px", color: "var(--text-dim)", marginTop: "4px", lineHeight: 1.5 }}>Allocating <span style={{ color: "var(--neon-green)" }}>${myRequests[0].requirements.monthlyBudget}/mo</span> to maximize <span style={{ color: "var(--neon-blue)" }}>{myRequests[0].requirements.primaryGoal}</span>.</div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div style={{ textAlign: "center", padding: "60px 20px" }}>
+                      <div style={{ fontSize: "40px", marginBottom: "16px" }}>⚡</div>
+                      <h4 style={{ fontSize: "20px", marginBottom: "8px", fontFamily: "'Bebas Neue'", letterSpacing: "0.05em" }}>NO CAMPAIGNS DETECTED</h4>
+                      <p style={{ color: "var(--text-dim)", fontSize: "14px", marginBottom: "24px", maxWidth: "400px", margin: "0 auto 24px" }}>
+                        Your AI Marketing Agent is standing by. Provide your business requirements to initialize your custom strategy.
+                      </p>
+                      <button className="btn-primary" onClick={() => setActiveTab("deploy")} style={{ padding: "16px 32px", borderRadius: "8px", fontSize: "14px" }}>
+                        INITIALIZE AI AGENT →
+                      </button>
+                    </div>
+                  )
+                ) : (
+                  <div style={{ color: "var(--neon-green)", textAlign: "center", padding: "40px" }}>{campaigns.length} Active Campaigns Running Globally</div>
+                )}
+              </div>
             </div>
           )}
 
-          {/* DEPLOY AGENT TAB (The New Intake Workflow) */}
+          {/* DEPLOY AGENT TAB */}
           {activeTab === "deploy" && (
             <div style={{ maxWidth: "900px" }}>
               <div style={{ marginBottom: "32px" }}>
@@ -286,6 +369,60 @@ export default function ClientDashboard() {
               <div className="card-hover" style={{ background: "var(--card)", padding: "40px", borderRadius: "16px", border: "1px solid var(--border)" }}>
                 <h2 style={{ fontSize: "20px", fontWeight: 700, marginBottom: "24px" }}>Step 2: AI Agent Briefing</h2>
                 <form onSubmit={handleProceedToCheckout} style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+
+{/* Row 1: Domain & Type */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                    <div>
+                      <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Business Domain *</label>
+                      <select required value={intakeData.businessDomain} onChange={e => setIntakeData({...intakeData, businessDomain: e.target.value})} style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "var(--black)", color: "white", border: "1px solid var(--border)" }}>
+                        {availableDomains.map(d => <option key={d} value={d}>{d}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Business Type *</label>
+                      <select required value={intakeData.businessType} onChange={e => setIntakeData({...intakeData, businessType: e.target.value})} style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "var(--black)", color: "white", border: "1px solid var(--border)" }}>
+                        {availableTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                    </div>
+                  </div>
+
+{/* Row 2: Budget & Goals */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                    <div>
+                      <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Primary Goal *</label>
+                      <select required value={intakeData.primaryGoal} onChange={e => setIntakeData({...intakeData, primaryGoal: e.target.value})} style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "var(--black)", color: "white", border: "1px solid var(--border)" }}>{availableGoals.map(g => <option key={g} value={g}>{g}</option>)}</select>
+                    </div>
+                    <div>
+                      <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Monthly Ad Budget ($) *</label>
+                      <input type="number" required placeholder="e.g. 5000" value={intakeData.monthlyBudget} onChange={e => setIntakeData({...intakeData, monthlyBudget: e.target.value})} style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "var(--black)", color: "white", border: "1px solid var(--border)" }} />
+                    </div>
+                  </div>
+
+{/* Row 3: URL & Geography */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                    <div>
+                      <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Business URL (Optional)</label>
+                      <input type="url" placeholder="https://" value={intakeData.businessUrl} onChange={e => setIntakeData({...intakeData, businessUrl: e.target.value})} style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "var(--black)", color: "white", border: "1px solid var(--border)" }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Target Geography *</label>
+                      <input type="text" required placeholder="e.g. Nationwide, or Miami FL" value={intakeData.geography} onChange={e => setIntakeData({...intakeData, geography: e.target.value})} style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "var(--black)", color: "white", border: "1px solid var(--border)" }} />
+                    </div>
+                  </div>
+
+                  {/* Text Areas for Context */}
+                  <div>
+                    <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Target Audience Profile *</label>
+                    <textarea required placeholder="Describe your ideal customer (Age, interests, pain points)..." value={intakeData.targetAudience} onChange={e => setIntakeData({...intakeData, targetAudience: e.target.value})} style={{ width: "100%", padding: "12px", borderRadius: "8px", minHeight: "80px", resize: "vertical", background: "var(--black)", color: "white", border: "1px solid var(--border)" }} />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Unique Selling Proposition (USP) *</label>
+                    <textarea required placeholder="Why should customers choose you over competitors? What makes you unique?" value={intakeData.usp} onChange={e => setIntakeData({...intakeData, usp: e.target.value})} style={{ width: "100%", padding: "12px", borderRadius: "8px", minHeight: "80px", resize: "vertical", background: "var(--black)", color: "white", border: "1px solid var(--border)" }} />
+                  </div>
+
+
+
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
                     <div>
                       <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Primary Goal *</label>
@@ -396,7 +533,7 @@ export default function ClientDashboard() {
             </div>
           )}
 
-          {/* ASSETS TAB (FULLY FUNCTIONAL FILE UPLOAD) */}
+          {/* ASSETS TAB (WITH CLOUDINARY LOGIC) */}
           {activeTab === "assets" && (
             <div style={{ maxWidth: "800px" }}>
               <div className="card-hover" style={{ padding: "40px", borderRadius: "16px", background: "var(--card)", border: "1px dashed var(--border)", textAlign: "center", marginBottom: "24px" }}>
@@ -404,8 +541,8 @@ export default function ClientDashboard() {
                 <h3 style={{ fontSize: "18px", fontWeight: 700, marginBottom: "8px" }}>Upload Brand Assets</h3>
                 <p style={{ color: "var(--text-dim)", fontSize: "14px", marginBottom: "24px" }}>Upload your Logos, Brand Guidelines (PDF), and past Ad Creatives here.</p>
                 
-                {uploadProgress > 0 && uploadProgress < 100 ? (
-                  <div style={{ color: "var(--orange)", fontWeight: 700 }}>Uploading... {uploadProgress}%</div>
+                {uploadStatus ? (
+                  <div style={{ color: "var(--orange)", fontWeight: 700 }}>{uploadStatus}</div>
                 ) : (
                   <>
                     <input type="file" id="file-upload" hidden onChange={handleAssetUpload} />
@@ -470,32 +607,31 @@ export default function ClientDashboard() {
             </div>
           )}
 
-          {/* PROFILE TAB (EXPANDED & WIRED) */}
+          {/* PROFILE TAB (RESTORED SERVICE PROTOCOL) */}
           {activeTab === "profile" && (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "24px", maxWidth: "700px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
+              
               <div className="card-hover" style={{ padding: "32px", borderRadius: "16px", background: "var(--card)" }}>
                 <h3 style={{ fontWeight: 700, marginBottom: "24px" }}>Company Profile</h3>
                 
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" }}>
-                  <div>
-                    <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Company Name</label>
-                    <input value={profileForm.companyName} onChange={e => setProfileForm({...profileForm, companyName: e.target.value})} style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "var(--black3)", border: "1px solid var(--border)", color: "white" }} />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Industry</label>
-                    <input value={profileForm.industry} onChange={e => setProfileForm({...profileForm, industry: e.target.value})} placeholder="e.g. Real Estate" style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "var(--black3)", border: "1px solid var(--border)", color: "white" }} />
-                  </div>
+                <div style={{ marginBottom: "16px" }}>
+                  <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Company Name</label>
+                  <input value={profileForm.companyName} onChange={e => setProfileForm({...profileForm, companyName: e.target.value})} style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "var(--black3)", border: "1px solid var(--border)", color: "white" }} />
+                </div>
+                
+                <div style={{ marginBottom: "16px" }}>
+                  <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Industry</label>
+                  <input value={profileForm.industry} onChange={e => setProfileForm({...profileForm, industry: e.target.value})} placeholder="e.g. Real Estate" style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "var(--black3)", border: "1px solid var(--border)", color: "white" }} />
                 </div>
 
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" }}>
-                  <div>
-                    <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Email Address</label>
-                    <input value={profileForm.email} readOnly style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "var(--black2)", border: "1px solid var(--border)", color: "var(--text-dimmer)" }} />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Phone Number</label>
-                    <input value={profileForm.phone} onChange={e => setProfileForm({...profileForm, phone: e.target.value})} style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "var(--black3)", border: "1px solid var(--border)", color: "white" }} />
-                  </div>
+                <div style={{ marginBottom: "16px" }}>
+                  <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Email Address</label>
+                  <input value={profileForm.email} readOnly style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "var(--black2)", border: "1px solid var(--border)", color: "var(--text-dimmer)" }} />
+                </div>
+
+                <div style={{ marginBottom: "16px" }}>
+                  <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Phone Number</label>
+                  <input value={profileForm.phone} onChange={e => setProfileForm({...profileForm, phone: e.target.value})} style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "var(--black3)", border: "1px solid var(--border)", color: "white" }} />
                 </div>
 
                 <div style={{ marginBottom: "24px" }}>
@@ -505,13 +641,39 @@ export default function ClientDashboard() {
 
                 <button className="btn-primary" onClick={handleSaveProfile} style={{ padding: "12px 24px", borderRadius: "8px", fontSize: "13px" }}>SAVE PROFILE DATA</button>
               </div>
+
+              {/* Service Protocol Details */}
+              <div className="card-hover" style={{ padding: "32px", borderRadius: "16px", background: "var(--card)" }}>
+                <h3 style={{ fontWeight: 700, marginBottom: "24px" }}>Your Service Protocol</h3>
+                <div style={{ padding: "16px", background: "rgba(255,85,0,0.1)", border: "1px solid rgba(255,85,0,0.3)", borderRadius: "12px", marginBottom: "24px" }}>
+                  <div style={{ fontSize: "11px", color: "var(--orange)", textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: "'JetBrains Mono'", marginBottom: "4px" }}>Active Subscription Tier</div>
+                  <div style={{ fontSize: "24px", fontFamily: "'Bebas Neue'", color: "white" }}>{clientData?.plan || "PENDING SETUP"}</div>
+                </div>
+                
+                <div>
+                  <h4 style={{ fontSize: "12px", color: "var(--text-dimmer)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "16px" }}>Included Capabilities</h4>
+                  <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "12px" }}>
+                    {tierServices[clientData?.plan?.toUpperCase()] ? (
+                      tierServices[clientData?.plan?.toUpperCase()].map((service, i) => (
+                        <li key={i} style={{ fontSize: "13px", color: "var(--text)", display: "flex", alignItems: "center", gap: "12px" }}>
+                          <div style={{ width: "16px", height: "16px", borderRadius: "50%", background: "rgba(0,255,148,0.1)", color: "var(--neon-green)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px" }}>✓</div>
+                          {service}
+                        </li>
+                      ))
+                    ) : (
+                      <li style={{ fontSize: "13px", color: "var(--text-dim)" }}>Awaiting Admin tier assignment.</li>
+                    )}
+                  </ul>
+                </div>
+              </div>
+
             </div>
           )}
 
         </div>
       </div>
 
-      {/* SECURE CHECKOUT MODAL (Mocked for Now - Replaces Stripe Redirection) */}
+      {/* SECURE CHECKOUT MODAL (Mocked) */}
       {showCheckout && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.9)", backdropFilter: "blur(10px)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }}>
           <div className="card-hover" style={{ background: "var(--card)", padding: "40px", borderRadius: "16px", maxWidth: "400px", width: "100%", border: "1px solid var(--orange)" }}>
@@ -524,7 +686,7 @@ export default function ClientDashboard() {
 
             <div style={{ display: "flex", gap: "12px" }}>
               <button className="btn-ghost" onClick={() => setShowCheckout(false)} style={{ flex: 1, padding: "12px", borderRadius: "8px" }}>CANCEL</button>
-              <button className="btn-primary" onClick={processPaymentAndSubmit} style={{ flex: 2, padding: "12px", borderRadius: "8px" }}>SUBMIT BRIEF FOR REVIEW</button>
+              <button className="btn-primary" onClick={processPaymentAndSubmit} style={{ flex: 2, padding: "12px", borderRadius: "8px" }}>SUBMIT BRIEF</button>
             </div>
           </div>
         </div>

@@ -477,10 +477,10 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* --- THE AI BRIEF POPUP MODAL (WITH REJECTION LOGIC) --- */}
+        {/* --- EXPANDED AI BRIEF POPUP MODAL (WITH ALL FIELDS + REJECTION) --- */}
         {selectedRequest && (
           <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(10px)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
-            <div className="card-hover" style={{ background: "var(--black2)", padding: "40px", borderRadius: "16px", maxWidth: "600px", width: "100%", position: "relative", border: "1px solid rgba(255,85,0,0.3)" }}>
+            <div className="card-hover" style={{ background: "var(--black2)", padding: "40px", borderRadius: "16px", maxWidth: "800px", width: "100%", position: "relative", border: "1px solid rgba(255,85,0,0.3)", maxHeight: "90vh", overflowY: "auto" }}>
               <button onClick={() => setSelectedRequest(null)} style={{ position: "absolute", top: "20px", right: "24px", background: "transparent", border: "none", color: "var(--text-dimmer)", fontSize: "24px", cursor: "pointer" }}>×</button>
               
               <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "24px" }}>
@@ -492,6 +492,18 @@ export default function AdminDashboard() {
               </div>
               
               <div style={{ display: "flex", flexDirection: "column", gap: "20px", marginBottom: "32px" }}>
+                
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                  <div>
+                    <label style={{ fontSize: "10px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "4px" }}>Business Domain</label>
+                    <div style={{ padding: "12px", background: "var(--black3)", borderRadius: "8px", fontSize: "13px", border: "1px solid var(--border)" }}>{selectedRequest.requirements?.businessDomain}</div>
+                  </div>
+                  <div>
+                    <label style={{ fontSize: "10px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "4px" }}>Business Type</label>
+                    <div style={{ padding: "12px", background: "var(--black3)", borderRadius: "8px", fontSize: "13px", border: "1px solid var(--border)" }}>{selectedRequest.requirements?.businessType}</div>
+                  </div>
+                </div>
+
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
                   <div>
                     <label style={{ fontSize: "10px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "4px" }}>Primary Goal</label>
@@ -501,11 +513,44 @@ export default function AdminDashboard() {
                     <label style={{ fontSize: "10px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "4px" }}>Monthly Budget</label>
                     <div style={{ padding: "12px", background: "var(--black3)", borderRadius: "8px", fontSize: "13px", border: "1px solid var(--border)" }}>${selectedRequest.requirements?.monthlyBudget}</div>
                   </div>
-                  <div style={{ gridColumn: "span 2" }}>
-                    <label style={{ fontSize: "10px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "4px" }}>Target Audience</label>
-                    <div style={{ padding: "12px", background: "var(--black3)", borderRadius: "8px", fontSize: "13px", border: "1px solid var(--border)", minHeight: "60px" }}>{selectedRequest.requirements?.targetAudience}</div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                  <div>
+                    <label style={{ fontSize: "10px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "4px" }}>Target Geography</label>
+                    <div style={{ padding: "12px", background: "var(--black3)", borderRadius: "8px", fontSize: "13px", border: "1px solid var(--border)" }}>{selectedRequest.requirements?.geography}</div>
+                  </div>
+                  <div>
+                    <label style={{ fontSize: "10px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "4px" }}>Requested Channels</label>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                      {selectedRequest.requirements?.channels?.map(channel => (
+                        <span key={channel} style={{ padding: "4px 8px", background: "var(--black)", border: "1px solid var(--orange)", color: "var(--orange)", borderRadius: "12px", fontSize: "10px", fontWeight: 700 }}>{channel}</span>
+                      ))}
+                    </div>
                   </div>
                 </div>
+
+                <div>
+                  <label style={{ fontSize: "10px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "4px" }}>Target Audience</label>
+                  <div style={{ padding: "12px", background: "var(--black3)", borderRadius: "8px", fontSize: "13px", border: "1px solid var(--border)" }}>{selectedRequest.requirements?.targetAudience}</div>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: "10px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "4px" }}>Unique Selling Proposition (USP)</label>
+                  <div style={{ padding: "12px", background: "var(--black3)", borderRadius: "8px", fontSize: "13px", border: "1px solid var(--border)" }}>{selectedRequest.requirements?.usp}</div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                  <div>
+                    <label style={{ fontSize: "10px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "4px" }}>Competitors</label>
+                    <div style={{ padding: "12px", background: "var(--black3)", borderRadius: "8px", fontSize: "13px", border: "1px solid var(--border)" }}>{selectedRequest.requirements?.competitors || "None listed"}</div>
+                  </div>
+                  <div>
+                    <label style={{ fontSize: "10px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "4px" }}>Offers / Magnets</label>
+                    <div style={{ padding: "12px", background: "var(--black3)", borderRadius: "8px", fontSize: "13px", border: "1px solid var(--border)" }}>{selectedRequest.requirements?.offers || "None listed"}</div>
+                  </div>
+                </div>
+
               </div>
 
               {/* REJECTION FEEDBACK INPUT */}
