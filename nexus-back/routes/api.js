@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
-
+const rateLimit = require('express-rate-limit');
+const verifyToken = require('../middleware/authMiddleware'); // <-- THE BOUNCER
+const { syncWithAdNetworks } = require('../services/adNetworkSync');
 // Import Controllers
 
 const { getCampaigns, createCampaign } = require('../controllers/campaignController');
@@ -18,35 +20,60 @@ const {
 
 const { saveAsset, getAssets, upload } = require('../controllers/assetController');
 
-// --- ROUTES ---
 
+// --- RATE LIMITER ---
+// Prevents DDoS attacks and spam bot submissions
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per window
+  message: { error: 'Too many requests from this IP, please try again later.' }
+});
+
+// --- ROUTES ---
 // Campaigns
-router.get('/campaigns', getCampaigns);
-router.post('/campaigns', createCampaign);
+router.get('/campaigns', verifyToken, getCampaigns);
+router.post('/campaigns', verifyToken, createCampaign);
+
 
 // Clients
-router.get('/clients', getClients);
-router.post('/clients', createClient);
-router.put('/clients/:uid', updateClientProfile); // <-- NEW: Save Profile Data
+router.get('/clients', verifyToken, getClients);
+router.post('/clients', verifyToken, createClient);
+router.put('/clients/:uid',verifyToken, updateClientProfile); // <-- NEW: Save Profile Data
 
 // Tasks
-router.get('/tasks', getTasks);
-router.post('/tasks', createTask);
-router.put('/tasks/:id', updateTask);
+router.get('/tasks',verifyToken, getTasks);
+router.post('/tasks', verifyToken, createTask);
+router.put('/tasks/:id', verifyToken, updateTask);
 
 // Messages
-router.get('/messages', getMessages);
-router.post('/messages', createMessage);
+router.get('/messages',verifyToken, getMessages);
+router.post('/messages',verifyToken, createMessage);
 
 // Service Requests (AI Intake)
-router.get('/service-requests', getServiceRequests);
-router.post('/service-requests', createServiceRequest);
-router.put('/service-requests/:id', updateServiceRequest);
-router.put('/service-requests/:id/approve', approveServiceRequest);
-router.put('/service-requests/:id/reject', rejectServiceRequest); // <-- NEW: Admin Reject
+router.get('/service-requests',verifyToken, getServiceRequests);
+router.post('/service-requests', verifyToken, createServiceRequest);
+router.put('/service-requests/:id', verifyToken, updateServiceRequest);
+router.put('/service-requests/:id/approve', verifyToken, approveServiceRequest);
+router.put('/service-requests/:id/reject', verifyToken, rejectServiceRequest); // <-- NEW: Admin Reject
 
 // NEW: Assets Routes
-router.get('/assets', getAssets);
-router.post('/assets', upload, saveAsset);
+router.get('/assets',verifyToken, getAssets);
+router.post('/assets',verifyToken, upload, saveAsset);
+router.delete('/assets/:id', verifyToken, async (req, res) => {
+  try {
+    const db = require('../config/db');
+    await db.collection('assets').doc(req.params.id).delete();
+    res.status(200).json({ message: "Asset deleted" });
+  } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+router.post('/campaigns/sync', verifyToken, async (req, res) => {
+  try {
+    await syncWithAdNetworks();
+    res.status(200).json({ message: "Ad Networks Synced Successfully" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 module.exports = router;
