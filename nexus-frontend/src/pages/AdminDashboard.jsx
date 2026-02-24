@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
+import toast, { Toaster } from "react-hot-toast"; // <-- NEW IMPORT
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -15,7 +16,7 @@ export default function AdminDashboard() {
   const [tasks, setTasks] = useState([]);
   const [messages, setMessages] = useState([]);
   const [serviceRequests, setServiceRequests] = useState([]); 
-  const [assets, setAssets] = useState([]); // <-- NEW: ALL CLIENT ASSETS
+  const [assets, setAssets] = useState([]); 
   const [loading, setLoading] = useState(true);
   const [networkError, setNetworkError] = useState(false);
   
@@ -45,7 +46,7 @@ export default function AdminDashboard() {
           safeGet('/tasks'),
           safeGet('/messages'),
           safeGet('/service-requests'),
-          safeGet('/assets') // <-- FETCH ASSETS
+          safeGet('/assets') 
         ]);
 
         setCampaigns(campRes.data);
@@ -67,27 +68,24 @@ export default function AdminDashboard() {
     try {
       await api.put(`/service-requests/${request.id}/approve`);
       setServiceRequests(prev => prev.map(req => req.id === request.id ? { ...req, status: 'approved' } : req));
-      
-      // Auto-update Client Tier locally
       setClients(prev => prev.map(c => c.uid === request.clientId ? { ...c, plan: request.requirements.selectedTier } : c));
-      
       setSelectedRequest(null);
-      alert(`AI Agent deployed! Client has been officially upgraded to the ${request.requirements.selectedTier} Tier.`);
+      toast.success(`AI Agent deployed! Client upgraded to ${request.requirements.selectedTier} Tier.`); // <-- REPLACED ALERT
     } catch (error) {
-      alert("Error approving request. Check console.");
+      toast.error("Error approving request. Check console."); 
     }
   };
 
   const handleReject = async (request) => {
-    if(!adminFeedback) return alert("Please type feedback explaining what needs clarification.");
+    if(!adminFeedback) return toast.error("Please type feedback explaining what needs clarification."); // <-- REPLACED ALERT
     try {
       await api.put(`/service-requests/${request.id}/reject`, { feedback: adminFeedback });
       setServiceRequests(prev => prev.map(req => req.id === request.id ? { ...req, status: 'needs_clarification' } : req));
       setSelectedRequest(null);
       setAdminFeedback("");
-      alert("Brief bounced back to client for clarification.");
+      toast.success("Brief bounced back to client for clarification."); 
     } catch (error) {
-      alert("Error rejecting request.");
+      toast.error("Error rejecting request."); 
     }
   };
 
@@ -98,22 +96,20 @@ export default function AdminDashboard() {
       setCampaigns([...campaigns, { id: res.data.id, ...newCampaign }]);
       setShowCampaignModal(false);
       setNewCampaign({ name: "", clientId: "", channel: "Google Ads", spend: 0, leads: 0, status: "live" });
-      alert("Campaign successfully deployed! This will instantly appear on the Client's dashboard.");
-    } catch (error) { alert("Failed to create campaign."); }
+      toast.success("Campaign successfully deployed!"); // <-- REPLACED ALERT
+    } catch (error) { toast.error("Failed to create campaign."); }
   };
 
-  // ADMIN CREATE TASK LOGIC
   const handleCreateTask = async (e) => {
     e.preventDefault();
     try {
       const res = await api.post('/tasks', newTask);
       setTasks([...tasks, { id: res.data.id, ...newTask }]);
       setNewTask({ title: "", clientId: "", status: "todo" });
-      alert("Task Assigned to Client!");
-    } catch (err) { alert("Failed to assign task."); }
+      toast.success("Task Assigned to Client!"); // <-- REPLACED ALERT
+    } catch (err) { toast.error("Failed to assign task."); }
   };
 
-  // 1-ON-1 CHAT LOGIC
   const handleSendReply = async () => {
     if (!chatMsg.trim() || !selectedChatClient) return;
     const newMsg = { 
@@ -145,16 +141,33 @@ export default function AdminDashboard() {
     { id: "requests", icon: "⚡", label: "AI Briefs", badge: serviceRequests.filter(r => r.status === 'pending_admin_review').length || null }, 
     { id: "clients", icon: "◉", label: "Clients", badge: clients.length || null },
     { id: "campaigns", icon: "▲", label: "Campaigns" },
-    { id: "assets", icon: "📁", label: "Client Assets" }, // NEW
+    { id: "assets", icon: "📁", label: "Client Assets" }, 
     { id: "analytics", icon: "📊", label: "Analytics" },
     { id: "tasks", icon: "☑", label: "Task Board" },
-    { id: "messages", icon: "✉", label: "Direct Inbox" }, // UPDATED
+    { id: "messages", icon: "✉", label: "Direct Inbox" }, 
   ];
 
-  if (loading) return <div style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--orange)" }}>LOADING ADMIN MAINFRAME...</div>;
+  // --- NEW SKELETON UI LOADER ---
+  if (loading) return (
+    <div style={{ height: "100vh", display: "flex", background: "var(--black)", padding: "32px", gap: "32px" }}>
+      <style>{`@keyframes pulse { 0% { opacity: 0.8; } 50% { opacity: 0.3; } 100% { opacity: 0.8; } } .sk-pulse { animation: pulse 1.5s infinite; background: var(--black2); border-radius: 12px; }`}</style>
+      <div className="sk-pulse" style={{ width: "240px", height: "100%" }} />
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "24px" }}>
+        <div className="sk-pulse" style={{ width: "30%", height: "40px" }} />
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "16px" }}>
+          <div className="sk-pulse" style={{ height: "120px" }} /><div className="sk-pulse" style={{ height: "120px" }} /><div className="sk-pulse" style={{ height: "120px" }} /><div className="sk-pulse" style={{ height: "120px" }} />
+        </div>
+        <div className="sk-pulse" style={{ flex: 1 }} />
+      </div>
+    </div>
+  );
 
   return (
     <div style={{ display: "flex", height: "100vh", overflow: "hidden" }}>
+      
+      {/* GLOBAL TOAST COMPONENT */}
+      <Toaster position="top-right" toastOptions={{ style: { background: '#222', color: '#fff', border: '1px solid #444' } }} />
+
       {/* Sidebar */}
       <div style={{ width: "250px", flexShrink: 0, background: "var(--black2)", borderRight: "1px solid var(--border)", display: "flex", flexDirection: "column", padding: "20px 12px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "12px", marginBottom: "8px" }}>
@@ -323,7 +336,7 @@ export default function AdminDashboard() {
             </div>
           )}
 
-{/* NEW ASSETS TAB (Admin View) */}
+          {/* ASSETS TAB (NOW RESOLVES CLIENT ID TO REAL NAME!) */}
           {activeTab === "assets" && (
             <div className="card-hover" style={{ borderRadius: "16px", background: "var(--card)", overflow: "hidden" }}>
               {assets.length === 0 ? <div style={{ padding: "40px", textAlign: "center" }}>No client assets uploaded yet.</div> : (
@@ -331,7 +344,7 @@ export default function AdminDashboard() {
                   <thead><tr><th>Client Name</th><th>File Name</th><th>Action</th></tr></thead>
                   <tbody>
                     {assets.map(a => {
-                      // Find the client name that matches the ID
+                      // Dynamically finds the client name based on the asset's clientId
                       const owner = clients.find(c => c.uid === a.clientId);
                       return (
                         <tr key={a.id}>
@@ -350,8 +363,7 @@ export default function AdminDashboard() {
             </div>
           )}
 
-
-          {/* TASKS TAB (Now with Task Assignment features) */}
+          {/* TASKS TAB */}
           {activeTab === "tasks" && (
             <div style={{ display: "flex", gap: "24px", alignItems: "flex-start" }}>
               <div className="card-hover" style={{ flex: 1, padding: "24px", borderRadius: "16px", background: "var(--card)" }}>
@@ -384,7 +396,7 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* MESSAGES TAB (Now is a 1-on-1 DIRECT INBOX) */}
+          {/* MESSAGES TAB */}
           {activeTab === "messages" && (
             <div className="card-hover" style={{ borderRadius: "16px", background: "var(--card)", display: "flex", height: "calc(100vh - 200px)", overflow: "hidden" }}>
               <div style={{ width: "300px", borderRight: "1px solid var(--border)", background: "var(--black2)", display: "flex", flexDirection: "column" }}>
@@ -485,7 +497,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* --- EXPANDED AI BRIEF POPUP MODAL (WITH ALL FIELDS + REJECTION) --- */}
+        {/* --- EXPANDED AI BRIEF POPUP MODAL --- */}
         {selectedRequest && (
           <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(10px)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
             <div className="card-hover" style={{ background: "var(--black2)", padding: "40px", borderRadius: "16px", maxWidth: "800px", width: "100%", position: "relative", border: "1px solid rgba(255,85,0,0.3)", maxHeight: "90vh", overflowY: "auto" }}>
