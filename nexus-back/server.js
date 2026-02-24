@@ -22,6 +22,14 @@ app.get('/', (req, res) => {
 
 const PORT = process.env.PORT || 5000;
 
+const cron = require('node-cron');
+const { syncWithAdNetworks } = require('./services/adNetworkSync');
+
+// Schedule the automated Ad Sync to run every night at Midnight (00:00)
+cron.schedule('0 0 * * *', () => {
+  syncWithAdNetworks();
+});
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });

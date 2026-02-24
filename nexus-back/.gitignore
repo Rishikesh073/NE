@@ -1,5 +1,6 @@
 # Firebase Credentials (CRITICAL)
 serviceAccountKey.json
+firebaseServiceAccount.json
 
 # Dependencies
 node_modules/

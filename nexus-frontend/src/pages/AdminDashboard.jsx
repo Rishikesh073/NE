@@ -132,6 +132,19 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleForceSync = async () => {
+    const toastId = toast.loading("Pinging Meta & Google APIs...");
+    try {
+      await api.post('/campaigns/sync');
+      // Re-fetch campaigns to instantly show the new simulated numbers
+      const campRes = await api.get('/campaigns');
+      setCampaigns(campRes.data);
+      toast.success("Ad Networks Synced!", { id: toastId });
+    } catch (error) {
+      toast.error("Failed to sync networks.", { id: toastId });
+    }
+  };
+
   const totalMRR = clients.reduce((a, c) => a + (Number(c.mrr) || 0), 0);
   const totalLeads = campaigns.reduce((a, c) => a + (Number(c.leads) || 0), 0);
   const totalSpend = campaigns.reduce((a, c) => a + (Number(c.spend) || 0), 0);
@@ -312,9 +325,16 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* CAMPAIGNS TAB */}
+      {/* CAMPAIGNS TAB (Now With Auto-Sync) */}
           {activeTab === "campaigns" && (
             <div className="card-hover" style={{ borderRadius: "16px", background: "var(--card)", overflow: "hidden" }}>
+              <div style={{ padding: "24px", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <h3 style={{ fontWeight: 700, fontSize: "16px" }}>Live Ad Network Feeds</h3>
+                <button onClick={handleForceSync} className="btn-ghost" style={{ padding: "8px 16px", borderRadius: "8px", fontSize: "12px", border: "1px solid var(--neon-blue)", color: "var(--neon-blue)", display: "flex", gap: "8px", alignItems: "center" }}>
+                  <span>🔄</span> FORCE API SYNC
+                </button>
+              </div>
+
               {campaigns.length === 0 ? <div style={{ padding: "40px", textAlign: "center", color: "var(--text-dimmer)" }}>No campaigns deployed.</div> : (
                 <table>
                   <thead>
@@ -324,7 +344,7 @@ export default function AdminDashboard() {
                     {campaigns.map(c => (
                       <tr key={c.id}>
                         <td><span style={{ fontWeight: 600 }}>{c.name}</span></td>
-                        <td style={{ color: "var(--text-dim)", fontSize: "12px" }}>{c.clientId}</td>
+                        <td style={{ color: "var(--text-dim)", fontSize: "12px" }}>{c.clientId.substring(0,8)}...</td>
                         <td><span className={`tag status-${c.status || 'draft'}`}>{(c.status || 'live').toUpperCase()}</span></td>
                         <td><span style={{ color: "var(--orange)", fontFamily: "'JetBrains Mono'" }}>${c.spend}</span></td>
                         <td><span style={{ color: "var(--neon-green)", fontFamily: "'JetBrains Mono'" }}>{c.leads}</span></td>
