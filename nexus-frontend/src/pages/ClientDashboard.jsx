@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import api from "../services/api"; 
 import { useAuth } from "../contexts/AuthContext";
+import toast, { Toaster } from "react-hot-toast"; // <-- NEW IMPORT
 
 export default function ClientDashboard() {
   const navigate = useNavigate();
@@ -19,10 +20,8 @@ export default function ClientDashboard() {
   const [myAssets, setMyAssets] = useState([]); 
   const [loading, setLoading] = useState(true);
   
-  // CLOUDINARY UPLOAD & ASSET MANAGEMENT STATES
+  // CLOUDINARY UPLOAD STATE
   const [uploadStatus, setUploadStatus] = useState(""); 
-  const [assetSearch, setAssetSearch] = useState("");
-  const [assetFilter, setAssetFilter] = useState("ALL");
 
   // PROFILE STATE
   const [profileForm, setProfileForm] = useState({ companyName: "", contactName: "", email: "", phone: "", industry: "", website: "" });
@@ -116,17 +115,18 @@ export default function ClientDashboard() {
     try {
       await api.put(`/clients/${currentUser.uid}`, profileForm);
       setClientData({ ...clientData, ...profileForm });
-      alert("Profile updated securely.");
-    } catch (err) { alert("Error saving profile. Make sure Express server is running."); }
+      toast.success("Profile updated securely."); // <-- REPLACED ALERT
+    } catch (err) { toast.error("Error saving profile. Make sure Express server is running."); }
   };
 
   const handleProceedToCheckout = (e) => {
     e.preventDefault();
-    if(intakeData.channels.length === 0) return alert("Select at least one channel.");
+    if(intakeData.channels.length === 0) return toast.error("Select at least one channel."); // <-- REPLACED ALERT
     setShowCheckout(true); 
   };
 
   const processPaymentAndSubmit = async () => {
+    const loadingToast = toast.loading("Submitting Brief...");
     try {
       await api.post('/service-requests', {
         clientId: currentUser.uid, 
@@ -140,8 +140,8 @@ export default function ClientDashboard() {
       setActiveTab("overview");
       const reqRes = await api.get('/service-requests').catch(() => ({ data: [] }));
       setMyRequests(reqRes.data.filter(r => r.clientId === currentUser?.uid));
-      alert("AI Agent Brief submitted to Admin.");
-    } catch (error) { alert("Error submitting request."); }
+      toast.success("AI Agent Brief successfully submitted!", { id: loadingToast }); // <-- REPLACED ALERT
+    } catch (error) { toast.error("Error submitting request.", { id: loadingToast }); }
   };
 
   const handleLogout = async () => {
@@ -161,11 +161,13 @@ export default function ClientDashboard() {
     try { await api.post('/messages', newMsg); } catch (e) {}
   };
 
+  // --- SECURE CLOUDINARY API UPLOAD ---
   const handleAssetUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
     
     setUploadStatus("Uploading to secure cloud...");
+    const uploadToast = toast.loading("Uploading file...");
 
     const formData = new FormData();
     formData.append("file", file);
@@ -176,40 +178,16 @@ export default function ClientDashboard() {
       const res = await api.post('/assets', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
-      setMyAssets([res.data, ...myAssets]); // Prepend to show at the top
+      
+      setMyAssets([...myAssets, res.data]);
       setUploadStatus("");
+      toast.success("Asset uploaded successfully!", { id: uploadToast }); // <-- REPLACED ALERT
     } catch (error) {
       console.error(error);
       setUploadStatus("");
-      alert("Failed to upload asset. Check server logs.");
+      toast.error("Failed to upload asset.", { id: uploadToast });
     }
   };
-
-  // --- NEW: DELETE ASSET LOGIC ---
-  const handleDeleteAsset = async (assetId) => {
-    if (!window.confirm("Are you sure you want to delete this file? This cannot be undone.")) return;
-    
-    try {
-      await api.delete(`/assets/${assetId}`);
-      setMyAssets(myAssets.filter(a => a.id !== assetId));
-    } catch (error) {
-      alert("Failed to delete asset. Check server connection.");
-    }
-  };
-
-  // --- NEW: SEARCH & FILTER LOGIC ---
-  const displayedAssets = myAssets.filter(asset => {
-    const searchMatch = asset.name.toLowerCase().includes(assetSearch.toLowerCase());
-    let filterMatch = true;
-    
-    if (assetFilter === "IMAGES") {
-      filterMatch = asset.name.match(/\.(jpeg|jpg|gif|png|svg|webp)$/i);
-    } else if (assetFilter === "DOCUMENTS") {
-      filterMatch = asset.name.match(/\.(pdf|doc|docx|txt|csv|xls|xlsx)$/i);
-    }
-    
-    return searchMatch && filterMatch;
-  });
 
   const totalSpend = campaigns.reduce((sum, c) => sum + (Number(c.spend) || 0), 0);
   const totalLeads = campaigns.reduce((sum, c) => sum + (Number(c.leads) || 0), 0);
@@ -226,10 +204,29 @@ export default function ClientDashboard() {
     { id: "profile", icon: "◆", label: "My Profile" },
   ];
 
-  if (loading) return <div style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--orange)" }}>LOADING NEXUS SECURE PORTAL...</div>;
+  // --- NEW SKELETON UI LOADER ---
+  if (loading) return (
+    <div style={{ height: "100vh", display: "flex", background: "var(--black)", padding: "32px", gap: "32px" }}>
+      <style>{`@keyframes pulse { 0% { opacity: 0.8; } 50% { opacity: 0.3; } 100% { opacity: 0.8; } } .sk-pulse { animation: pulse 1.5s infinite; background: var(--black2); border-radius: 12px; }`}</style>
+      <div className="sk-pulse" style={{ width: "240px", height: "100%" }} />
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "24px" }}>
+        <div className="sk-pulse" style={{ width: "30%", height: "40px" }} />
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "16px" }}>
+          <div className="sk-pulse" style={{ height: "120px" }} />
+          <div className="sk-pulse" style={{ height: "120px" }} />
+          <div className="sk-pulse" style={{ height: "120px" }} />
+        </div>
+        <div className="sk-pulse" style={{ flex: 1 }} />
+      </div>
+    </div>
+  );
 
   return (
     <div style={{ display: "flex", height: "100vh", overflow: "hidden" }}>
+      
+      {/* GLOBAL TOAST COMPONENT */}
+      <Toaster position="top-right" toastOptions={{ style: { background: '#222', color: '#fff', border: '1px solid #444' } }} />
+
       {/* Sidebar */}
       <div style={{ width: "240px", flexShrink: 0, background: "var(--black2)", borderRight: "1px solid var(--border)", display: "flex", flexDirection: "column", padding: "20px 12px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "12px", marginBottom: "32px" }}>
@@ -547,10 +544,10 @@ export default function ClientDashboard() {
             </div>
           )}
 
-          {/* ASSETS TAB (WITH SEARCH, FILTER, AND DELETE) */}
+          {/* ASSETS TAB */}
           {activeTab === "assets" && (
             <div style={{ maxWidth: "800px" }}>
-              <div className="card-hover" style={{ padding: "40px", borderRadius: "16px", background: "var(--card)", border: "1px dashed var(--border)", textAlign: "center", marginBottom: "32px" }}>
+              <div className="card-hover" style={{ padding: "40px", borderRadius: "16px", background: "var(--card)", border: "1px dashed var(--border)", textAlign: "center", marginBottom: "24px" }}>
                 <div style={{ fontSize: "40px", marginBottom: "16px" }}>📁</div>
                 <h3 style={{ fontSize: "18px", fontWeight: 700, marginBottom: "8px" }}>Upload Brand Assets</h3>
                 <p style={{ color: "var(--text-dim)", fontSize: "14px", marginBottom: "24px" }}>Upload your Logos, Brand Guidelines (PDF), and past Ad Creatives here.</p>
@@ -565,41 +562,14 @@ export default function ClientDashboard() {
                 )}
               </div>
 
-              {/* Advanced Search & Filter Controls */}
-              <div style={{ display: "flex", gap: "16px", marginBottom: "24px" }}>
-                <input 
-                  type="text" 
-                  placeholder="🔍 Search files by name..." 
-                  value={assetSearch} 
-                  onChange={(e) => setAssetSearch(e.target.value)} 
-                  style={{ ...inputStyle, flex: 2, padding: "12px 16px" }} 
-                />
-                <select 
-                  value={assetFilter} 
-                  onChange={(e) => setAssetFilter(e.target.value)} 
-                  style={{ ...inputStyle, flex: 1, padding: "12px 16px" }}
-                >
-                  <option value="ALL">All Files</option>
-                  <option value="IMAGES">Images Only</option>
-                  <option value="DOCUMENTS">Documents & PDFs</option>
-                </select>
-              </div>
-
-              {/* Dynamic File List */}
+              {/* Display previously uploaded assets */}
               <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                {displayedAssets.length === 0 ? (
-                  <div style={{ textAlign: "center", padding: "32px", color: "var(--text-dimmer)" }}>No assets match your search.</div>
-                ) : (
-                  displayedAssets.map(asset => (
-                     <div key={asset.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px", background: "var(--black3)", borderRadius: "8px", border: "1px solid var(--border)" }}>
-                       <span style={{ fontSize: "14px", fontWeight: 600, color: "white" }}>{asset.name}</span>
-                       <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
-                         <a href={asset.url} target="_blank" rel="noopener noreferrer" style={{ color: "var(--neon-blue)", fontSize: "13px", textDecoration: "none", fontWeight: 700 }}>DOWNLOAD ↓</a>
-                         <button onClick={() => handleDeleteAsset(asset.id)} style={{ background: "transparent", border: "none", color: "var(--neon-pink)", fontSize: "13px", cursor: "pointer", fontWeight: 700 }}>DELETE ✕</button>
-                       </div>
-                     </div>
-                  ))
-                )}
+                {myAssets.map(asset => (
+                   <div key={asset.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px", background: "var(--black3)", borderRadius: "8px", border: "1px solid var(--border)" }}>
+                     <span style={{ fontSize: "13px", fontWeight: 600 }}>{asset.name}</span>
+                     <a href={asset.url} target="_blank" rel="noopener noreferrer" style={{ color: "var(--orange)", fontSize: "12px", textDecoration: "none" }}>Download ↓</a>
+                   </div>
+                ))}
               </div>
             </div>
           )}
@@ -650,29 +620,30 @@ export default function ClientDashboard() {
 
           {/* PROFILE TAB */}
           {activeTab === "profile" && (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
-              
+            <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "24px", maxWidth: "700px" }}>
               <div className="card-hover" style={{ padding: "32px", borderRadius: "16px", background: "var(--card)" }}>
                 <h3 style={{ fontWeight: 700, marginBottom: "24px", fontSize: "20px" }}>Company Profile</h3>
                 
-                <div style={{ marginBottom: "20px" }}>
-                  <label style={labelStyle}>Company Name</label>
-                  <input value={profileForm.companyName} onChange={e => setProfileForm({...profileForm, companyName: e.target.value})} style={inputStyle} />
-                </div>
-                
-                <div style={{ marginBottom: "20px" }}>
-                  <label style={labelStyle}>Industry</label>
-                  <input value={profileForm.industry} onChange={e => setProfileForm({...profileForm, industry: e.target.value})} placeholder="e.g. Real Estate" style={inputStyle} />
-                </div>
-
-                <div style={{ marginBottom: "20px" }}>
-                  <label style={labelStyle}>Email Address</label>
-                  <input value={profileForm.email} readOnly style={{ ...inputStyle, background: "rgba(255,255,255,0.03)", color: "#888", cursor: "not-allowed" }} />
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginBottom: "20px" }}>
+                  <div>
+                    <label style={labelStyle}>Company Name</label>
+                    <input value={profileForm.companyName} onChange={e => setProfileForm({...profileForm, companyName: e.target.value})} style={inputStyle} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Industry</label>
+                    <input value={profileForm.industry} onChange={e => setProfileForm({...profileForm, industry: e.target.value})} placeholder="e.g. Real Estate" style={inputStyle} />
+                  </div>
                 </div>
 
-                <div style={{ marginBottom: "20px" }}>
-                  <label style={labelStyle}>Phone Number</label>
-                  <input value={profileForm.phone} onChange={e => setProfileForm({...profileForm, phone: e.target.value})} style={inputStyle} />
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginBottom: "20px" }}>
+                  <div>
+                    <label style={labelStyle}>Email Address</label>
+                    <input value={profileForm.email} readOnly style={{ ...inputStyle, background: "rgba(255,255,255,0.03)", color: "#888", cursor: "not-allowed" }} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Phone Number</label>
+                    <input value={profileForm.phone} onChange={e => setProfileForm({...profileForm, phone: e.target.value})} style={inputStyle} />
+                  </div>
                 </div>
 
                 <div style={{ marginBottom: "28px" }}>
@@ -682,32 +653,6 @@ export default function ClientDashboard() {
 
                 <button className="btn-primary" onClick={handleSaveProfile} style={{ padding: "14px 28px", borderRadius: "8px", fontSize: "14px", fontWeight: 700 }}>SAVE PROFILE DATA</button>
               </div>
-
-              {/* Service Protocol Details */}
-              <div className="card-hover" style={{ padding: "32px", borderRadius: "16px", background: "var(--card)", height: "fit-content" }}>
-                <h3 style={{ fontWeight: 700, marginBottom: "24px", fontSize: "20px" }}>Your Service Protocol</h3>
-                <div style={{ padding: "16px", background: "rgba(255,85,0,0.1)", border: "1px solid rgba(255,85,0,0.3)", borderRadius: "12px", marginBottom: "24px" }}>
-                  <div style={{ fontSize: "11px", color: "var(--orange)", textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: "'JetBrains Mono'", marginBottom: "4px", fontWeight: 700 }}>Active Subscription Tier</div>
-                  <div style={{ fontSize: "24px", fontFamily: "'Bebas Neue'", color: "white" }}>{clientData?.plan || "PENDING SETUP"}</div>
-                </div>
-                
-                <div>
-                  <h4 style={{ fontSize: "12px", color: "var(--text-dimmer)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "16px", fontWeight: 700 }}>Included Capabilities</h4>
-                  <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "12px" }}>
-                    {tierServices[clientData?.plan?.toUpperCase()] ? (
-                      tierServices[clientData?.plan?.toUpperCase()].map((service, i) => (
-                        <li key={i} style={{ fontSize: "14px", color: "var(--text)", display: "flex", alignItems: "center", gap: "12px" }}>
-                          <div style={{ width: "18px", height: "18px", borderRadius: "50%", background: "rgba(0,255,148,0.1)", color: "var(--neon-green)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: 700 }}>✓</div>
-                          {service}
-                        </li>
-                      ))
-                    ) : (
-                      <li style={{ fontSize: "13px", color: "var(--text-dim)" }}>Awaiting Admin tier assignment.</li>
-                    )}
-                  </ul>
-                </div>
-              </div>
-
             </div>
           )}
 
