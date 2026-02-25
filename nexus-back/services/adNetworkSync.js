@@ -6,7 +6,7 @@ const syncWithAdNetworks = async () => {
   try {
     console.log("🔄 Starting Ad Network Sync (Meta/Google)...");
     const campaignsRef = db.collection('campaigns');
-    
+
     // Get all campaigns that are currently 'live'
     const snapshot = await campaignsRef.where('status', '==', 'live').get();
 
@@ -19,30 +19,73 @@ const syncWithAdNetworks = async () => {
 
     snapshot.forEach(doc => {
       const campaign = doc.data();
+      const clientTokens = campaign.tokens || {}; // Assume tokens are saved in campaign or fetched from client doc
       let newSpend = Number(campaign.spend) || 0;
       let newLeads = Number(campaign.leads) || 0;
 
       // ==========================================
       // 🚀 REAL API INTEGRATION GATES
-      // Once you get your developer keys, uncomment the Axios calls!
       // ==========================================
-      
+      // Note: In production, access tokens should be securely queried from the 
+      // 'clients' collection (e.g., doc.data().tokens.meta_access_token)
+
       if (campaign.channel === 'Google Ads') {
         /*
-        // TODO: Replace with real Google Ads API Call
-        const response = await axios.get(`https://googleads.googleapis.com/v14/customers/${YOUR_ID}/googleAds:search`, { headers: { Authorization: `Bearer ${GOOGLE_TOKEN}` }});
-        newSpend = response.data.spend;
-        */
+        // 1. Google Ads API Scaffolding
+        // Requires OAuth2 Refresh Token -> Access Token exchange in production
+        const GOOGLE_TOKEN = clientTokens.google_access_token || process.env.GOOGLE_DEV_TOKEN;
+        const CUSTOMER_ID = campaign.externalAccountId; // e.g. '123-456-7890'
         
+        const googleQuery = `
+          SELECT metrics.cost_micros, metrics.conversions 
+          FROM campaign 
+          WHERE campaign.id = '${campaign.externalCampaignId}' 
+          AND segments.date DURING LAST_7_DAYS
+        `;
+
+        const response = await axios.post(
+          \`https://googleads.googleapis.com/v14/customers/\${CUSTOMER_ID}/googleAds:search\`, 
+          { query: googleQuery },
+          { 
+            headers: { 
+              'Authorization': \`Bearer \${GOOGLE_TOKEN}\`,
+              'developer-token': process.env.GOOGLE_DEVELOPER_TOKEN
+            }
+          }
+        );
+        
+        // Google returns cost in micros (1 millionth of a unit). Divide by 1,000,000.
+        const metrics = response.data.results[0]?.metrics || { costMicros: 0, conversions: 0 };
+        newSpend += (Number(metrics.costMicros) / 1000000);
+        newLeads += Number(metrics.conversions);
+        */
+
         // MVP SIMULATION: Simulates daily Google Ads activity
         newSpend += Math.floor(Math.random() * 45) + 10; // Adds $10-$55 spend
         newLeads += Math.floor(Math.random() * 3);       // Adds 0-2 leads
-      } 
+      }
       else {
         /*
-        // TODO: Replace with real Meta Graph API Call
-        const response = await axios.get(`https://graph.facebook.com/v18.0/${CAMPAIGN_ID}/insights?fields=spend,actions`, { headers: { Authorization: `Bearer ${META_TOKEN}` }});
-        newSpend = response.data.spend;
+        // 2. Meta (Facebook) Graph API Scaffolding
+        const META_TOKEN = clientTokens.meta_access_token || process.env.META_DEV_TOKEN;
+        const CAMPAIGN_ID = campaign.externalCampaignId;
+        
+        const response = await axios.get(
+          \`https://graph.facebook.com/v18.0/\${CAMPAIGN_ID}/insights\`,
+          { 
+            params: {
+              fields: 'spend,actions',
+              date_preset: 'last_7d'
+            },
+            headers: { 'Authorization': \`Bearer \${META_TOKEN}\` }
+          }
+        );
+
+        const data = response.data.data[0] || { spend: 0, actions: [] };
+        const leadAction = data.actions?.find(a => a.action_type === 'lead') || { value: 0 };
+        
+        newSpend += Number(data.spend);
+        newLeads += Number(leadAction.value);
         */
 
         // MVP SIMULATION: Simulates daily Meta Ads activity
@@ -52,10 +95,10 @@ const syncWithAdNetworks = async () => {
 
       // Queue the update in Firestore
       const docRef = campaignsRef.doc(doc.id);
-      batch.update(docRef, { 
-        spend: newSpend, 
-        leads: newLeads, 
-        lastSynced: new Date().toISOString() 
+      batch.update(docRef, {
+        spend: newSpend,
+        leads: newLeads,
+        lastSynced: new Date().toISOString()
       });
     });
 

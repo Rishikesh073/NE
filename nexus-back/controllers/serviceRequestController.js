@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const { sendBriefApprovedEmail } = require('../services/emailService');
 
 // @route   PUT /api/service-requests/:id/approve
 const approveServiceRequest = async (req, res) => {
@@ -7,24 +8,29 @@ const approveServiceRequest = async (req, res) => {
     const requestRef = db.collection('serviceRequests').doc(id);
     const requestDoc = await requestRef.get();
     const requestData = requestDoc.data();
-    
+
     // 1. Update the status to 'approved'
     await requestRef.update({
       status: 'approved',
       approvedAt: new Date().toISOString()
     });
-    
+
     // 2. Automatically upgrade the Client's official Tier in the database
     if (requestData && requestData.clientId) {
       const clientsRef = db.collection('clients');
       const snapshot = await clientsRef.where('uid', '==', requestData.clientId).get();
       if (!snapshot.empty) {
         const clientDoc = snapshot.docs[0];
-        await clientDoc.ref.update({ 
+        await clientDoc.ref.update({
           plan: requestData.requirements?.selectedTier || "GROWTH",
           status: 'active'
         });
       }
+    }
+
+    // 📩 Send automated approval email asynchronously
+    if (requestData && requestData.clientEmail) {
+      sendBriefApprovedEmail(requestData.clientEmail, requestData.requirements?.selectedTier || "Custom");
     }
 
     res.status(200).json({ message: 'AI Agent Deployed & Tier Upgraded Successfully', id });
@@ -39,7 +45,7 @@ const rejectServiceRequest = async (req, res) => {
   try {
     const { id } = req.params;
     const { feedback } = req.body;
-    
+
     await db.collection('serviceRequests').doc(id).update({
       status: 'needs_clarification',
       adminFeedback: feedback,
@@ -60,7 +66,7 @@ const createServiceRequest = async (req, res) => {
       status: req.body.status || 'pending_admin_review',
       createdAt: new Date().toISOString()
     };
-    
+
     const docRef = await db.collection('serviceRequests').add(newRequest);
     res.status(201).json({ id: docRef.id, ...newRequest });
   } catch (error) {
@@ -73,7 +79,7 @@ const getServiceRequests = async (req, res) => {
   try {
     const requestsRef = db.collection('serviceRequests');
     const snapshot = await requestsRef.orderBy('createdAt', 'desc').get();
-    
+
     if (snapshot.empty) return res.status(200).json([]);
 
     const requests = [];
@@ -89,7 +95,7 @@ const updateServiceRequest = async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
-    
+
     const requestRef = db.collection('serviceRequests').doc(id);
     await requestRef.update(updates);
     res.status(200).json({ message: 'Service request updated successfully', id, ...updates });

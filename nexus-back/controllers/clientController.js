@@ -1,12 +1,12 @@
-// controllers/clientController.js
 const db = require('../config/db');
+const { sendWelcomeEmail } = require('../services/emailService');
 
 // Get all clients
 const getClients = async (req, res) => {
   try {
     const clientsRef = db.collection('clients');
     const snapshot = await clientsRef.get();
-    
+
     if (snapshot.empty) {
       return res.status(200).json([]);
     }
@@ -30,7 +30,7 @@ const updateClientProfile = async (req, res) => {
 
     const clientsRef = db.collection('clients');
     const snapshot = await clientsRef.where('uid', '==', uid).get();
-    
+
     if (!snapshot.empty) {
       await snapshot.docs[0].ref.update(profileData);
       res.status(200).json({ message: 'Profile Updated Successfully' });
@@ -50,6 +50,12 @@ const createClient = async (req, res) => {
   try {
     const newClient = req.body;
     const docRef = await db.collection('clients').add(newClient);
+
+    // 📩 Send automated welcome email asynchronously
+    if (newClient.email) {
+      sendWelcomeEmail(newClient.email, newClient.displayName || newClient.companyName || 'Valued Client');
+    }
+
     res.status(201).json({ id: docRef.id, ...newClient });
   } catch (error) {
     res.status(500).json({ error: error.message });

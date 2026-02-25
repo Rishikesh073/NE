@@ -1,5 +1,6 @@
 // controllers/messageController.js
 const db = require('../config/db');
+const { sendNewMessageNotification } = require('../services/emailService');
 
 // Get all messages (ordered by time)
 const getMessages = async (req, res) => {
@@ -7,7 +8,7 @@ const getMessages = async (req, res) => {
     const messagesRef = db.collection('messages');
     // Assuming you will save a 'timestamp' or 'time' field when creating
     const snapshot = await messagesRef.orderBy('time', 'asc').get();
-    
+
     if (snapshot.empty) {
       return res.status(200).json([]);
     }
@@ -31,6 +32,24 @@ const createMessage = async (req, res) => {
       time: new Date().toISOString() // Auto-generate timestamp if not provided
     };
     const docRef = await db.collection('messages').add(newMessage);
+
+    // 📩 Send automated notification asynchronously
+    // Using simple approach: if user is admin, fetch client email. If user is client, assume recipient is admin.
+    if (newMessage.to && newMessage.to !== 'admin_room') {
+      // Trying to find client email
+      const clientsRef = db.collection('clients');
+      const snapshot = await clientsRef.where('uid', '==', newMessage.to).get();
+      if (!snapshot.empty) {
+        const clientEmail = snapshot.docs[0].data().email;
+        if (clientEmail) {
+          sendNewMessageNotification(clientEmail, newMessage.from || 'Nexus Admin');
+        }
+      }
+    } else if (newMessage.to === 'admin_room') {
+      const adminEmail = process.env.ADMIN_EMAIL || 'admin@nexusproject.com';
+      sendNewMessageNotification(adminEmail, newMessage.from || 'A Client');
+    }
+
     res.status(201).json({ id: docRef.id, ...newMessage });
   } catch (error) {
     res.status(500).json({ error: error.message });
