@@ -30,6 +30,7 @@ cron.schedule('0 0 * * *', () => {
   syncWithAdNetworks();
 });
 
-app.listen(PORT, () => {
+// Explicitly bind to 0.0.0.0 for Render deployment
+app.listen(PORT, "0.0.0.0", () => {
   console.log(`Server running on port ${PORT}`);
 });

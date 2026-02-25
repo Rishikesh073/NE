@@ -1,6 +1,6 @@
 # Firebase Credentials (CRITICAL)
 serviceAccountKey.json
-firebaseServiceAccount.json
+
 
 # Dependencies
 node_modules/
@@ -20,3 +20,5 @@ yarn-error.log*
 # OS Generated Files
 .DS_Store
 Thumbs.db
+
+**/firebaseServiceAccount.json
