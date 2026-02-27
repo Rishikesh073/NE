@@ -146,10 +146,27 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     const fetchData = async () => {
+      setNetworkError(false); // Reset before each fetch attempt
       try {
+        // Wait for Firebase auth to be ready before making API calls
+        await new Promise((resolve) => {
+          const unsubscribe = import('../services/firebase').then(({ auth }) => {
+            if (auth.currentUser) { resolve(); return () => { }; }
+            const unsub = auth.onAuthStateChanged(user => { if (user) { unsub(); resolve(); } });
+            return unsub;
+          });
+          // Fallback timeout so we don't wait forever
+          setTimeout(resolve, 3000);
+        });
+
         const safeGet = (url) => api.get(url).catch(err => {
-          console.error(`Error fetching ${url}:`, err);
-          setNetworkError(true);
+          // Only flag as network error for server/network issues, not auth errors
+          if (!err.response || err.response.status >= 500 || err.code === 'ERR_NETWORK') {
+            console.error(`Network error fetching ${url}:`, err);
+            setNetworkError(true);
+          } else {
+            console.warn(`Non-critical error fetching ${url}:`, err.response?.status);
+          }
           return { data: [] };
         });
 
@@ -170,6 +187,7 @@ export default function AdminDashboard() {
         setAssets(assetRes.data || []);
       } catch (error) {
         console.error("Critical error fetching admin data:", error);
+        setNetworkError(true);
       } finally {
         setLoading(false);
       }

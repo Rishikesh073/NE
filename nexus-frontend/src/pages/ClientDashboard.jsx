@@ -527,26 +527,58 @@ export default function ClientDashboard() {
 
             {/* DEPLOY AGENT TAB */}
             {activeTab === "deploy" && (
-              <motion.div key="deploy" variants={tabVariants} initial="initial" animate="animate" exit="exit" style={{ maxWidth: "900px" }}>
-                <div style={{ marginBottom: "32px" }}>
-                  <h2 style={{ fontSize: "20px", fontWeight: 700, marginBottom: "8px" }}>Step 1: Select Your Protocol</h2>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "16px" }}>
-                    {pricingTiers.map(tier => (
-                      <div key={tier.name} onClick={() => setIntakeData({ ...intakeData, selectedTier: tier.name })} className="card-hover"
-                        style={{ padding: "24px", borderRadius: "12px", cursor: "pointer", border: intakeData.selectedTier === tier.name ? "2px solid var(--orange)" : "1px solid rgba(255,255,255,0.1)", background: intakeData.selectedTier === tier.name ? "rgba(255,85,0,0.08)" : "var(--card)" }}>
-                        <div style={{ fontSize: "14px", fontWeight: 700, fontFamily: "'JetBrains Mono'", color: intakeData.selectedTier === tier.name ? "var(--orange)" : "white" }}>{tier.name}</div>
-                        <div style={{ fontSize: "32px", fontFamily: "'Bebas Neue'", margin: "12px 0" }}>${tier.price}</div>
-                        <ul style={{ padding: 0, margin: 0, listStyle: "none", fontSize: "13px", color: "var(--text-dim)" }}>
-                          {tier.features.map(f => <li key={f} style={{ marginBottom: "8px" }}>✓ {f}</li>)}
-                        </ul>
-                      </div>
-                    ))}
+              <motion.div key="deploy" variants={tabVariants} initial="initial" animate="animate" exit="exit" style={{ maxWidth: "920px" }}>
+
+                {/* ── Step 1: Tier Selection ─────────────────────────────────── */}
+                <div style={{ marginBottom: "28px" }}>
+                  <h2 style={{ fontSize: "18px", fontWeight: 700, marginBottom: "16px", letterSpacing: "0.03em" }}>
+                    Step 1: Select Your Protocol
+                  </h2>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "14px" }}>
+                    {pricingTiers.map(tier => {
+                      const isActive = intakeData.selectedTier === tier.name;
+                      return (
+                        <div
+                          key={tier.name}
+                          onClick={() => setIntakeData({ ...intakeData, selectedTier: tier.name })}
+                          style={{
+                            padding: "22px 20px",
+                            borderRadius: "12px",
+                            cursor: "pointer",
+                            border: isActive ? "2px solid var(--orange)" : "1px solid rgba(255,255,255,0.1)",
+                            background: isActive ? "rgba(255,85,0,0.1)" : "#111111",
+                            boxShadow: isActive ? "0 0 28px rgba(255,85,0,0.18)" : "none",
+                            transition: "all 0.25s cubic-bezier(0.4,0,0.2,1)"
+                          }}
+                        >
+                          <div style={{ fontSize: "13px", fontWeight: 700, fontFamily: "'JetBrains Mono'", letterSpacing: "0.08em", color: isActive ? "var(--orange)" : "#aaaaaa", marginBottom: "10px" }}>
+                            {tier.name}
+                          </div>
+                          <div style={{ fontSize: "38px", fontFamily: "'Bebas Neue'", color: "white", lineHeight: 1, marginBottom: "14px" }}>
+                            ${tier.price}
+                          </div>
+                          <ul style={{ padding: 0, margin: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: "6px" }}>
+                            {tier.features.map(f => (
+                              <li key={f} style={{ fontSize: "13px", color: isActive ? "rgba(255,255,255,0.75)" : "var(--text-dim)", display: "flex", alignItems: "center", gap: "6px" }}>
+                                <span style={{ color: isActive ? "var(--orange)" : "var(--text-dimmer)", fontWeight: 700 }}>✓</span> {f}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
 
-                <div className="card-hover" style={{ background: "var(--card)", padding: "40px", borderRadius: "16px", border: "1px solid var(--border)" }}>
-                  <h2 style={{ fontSize: "20px", fontWeight: 700, marginBottom: "32px" }}>Step 2: AI Agent Briefing</h2>
-                  <form onSubmit={handleProceedToCheckout} style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+                {/* ── Step 2: AI Briefing Form ───────────────────────────────── */}
+                <div style={{ background: "#0f0f0f", padding: "36px 40px", borderRadius: "16px", border: "1px solid rgba(255,255,255,0.08)" }}>
+                  <h2 style={{ fontSize: "18px", fontWeight: 700, marginBottom: "28px", letterSpacing: "0.03em" }}>
+                    Step 2: AI Agent Briefing
+                  </h2>
+
+                  <form onSubmit={handleProceedToCheckout} style={{ display: "flex", flexDirection: "column", gap: "22px" }}>
+
+                    {/* Row 1 */}
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
                       <div>
                         <label style={labelStyle}>Business Domain *</label>
@@ -561,6 +593,8 @@ export default function ClientDashboard() {
                         </select>
                       </div>
                     </div>
+
+                    {/* Row 2 */}
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
                       <div>
                         <label style={labelStyle}>Primary Goal *</label>
@@ -570,9 +604,11 @@ export default function ClientDashboard() {
                       </div>
                       <div>
                         <label style={labelStyle}>Monthly Ad Budget ($) *</label>
-                        <input type="number" required placeholder="e.g. 5000" value={intakeData.monthlyBudget} onChange={e => setIntakeData({ ...intakeData, monthlyBudget: e.target.value })} style={inputStyle} />
+                        <input type="number" required placeholder="e.g. 5000" value={intakeData.monthlyBudget} onChange={e => setIntakeData({ ...intakeData, monthlyBudget: e.target.value })} style={inputStyle} min="1" />
                       </div>
                     </div>
+
+                    {/* Row 3 */}
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
                       <div>
                         <label style={labelStyle}>Business URL (Optional)</label>
@@ -583,39 +619,99 @@ export default function ClientDashboard() {
                         <input type="text" required placeholder="e.g. Nationwide, or Miami FL" value={intakeData.geography} onChange={e => setIntakeData({ ...intakeData, geography: e.target.value })} style={inputStyle} />
                       </div>
                     </div>
+
+                    {/* Target Audience */}
                     <div>
                       <label style={labelStyle}>Target Audience Profile *</label>
-                      <textarea required placeholder="Describe your ideal customer (Age, interests, pain points)..." value={intakeData.targetAudience} onChange={e => setIntakeData({ ...intakeData, targetAudience: e.target.value })} style={{ ...inputStyle, minHeight: "100px", resize: "vertical" }} />
+                      <textarea
+                        required
+                        placeholder="Describe your ideal customer (Age, interests, pain points)..."
+                        value={intakeData.targetAudience}
+                        onChange={e => setIntakeData({ ...intakeData, targetAudience: e.target.value })}
+                        style={{ ...inputStyle, minHeight: "108px", resize: "vertical", lineHeight: 1.6 }}
+                      />
                     </div>
+
+                    {/* USP */}
                     <div>
                       <label style={labelStyle}>Unique Selling Proposition (USP) *</label>
-                      <textarea required placeholder="Why should customers choose you over competitors?" value={intakeData.usp} onChange={e => setIntakeData({ ...intakeData, usp: e.target.value })} style={{ ...inputStyle, minHeight: "100px", resize: "vertical" }} />
+                      <textarea
+                        required
+                        placeholder="Why should customers choose you over competitors?"
+                        value={intakeData.usp}
+                        onChange={e => setIntakeData({ ...intakeData, usp: e.target.value })}
+                        style={{ ...inputStyle, minHeight: "108px", resize: "vertical", lineHeight: 1.6 }}
+                      />
                     </div>
+
+                    {/* Competitors & Offers */}
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
                       <div>
                         <label style={labelStyle}>Main Competitors</label>
-                        <textarea placeholder="List 2-3 competitor URLs or names..." value={intakeData.competitors} onChange={e => setIntakeData({ ...intakeData, competitors: e.target.value })} style={{ ...inputStyle, minHeight: "80px", resize: "vertical" }} />
+                        <textarea
+                          placeholder="List 2-3 competitor URLs or names..."
+                          value={intakeData.competitors}
+                          onChange={e => setIntakeData({ ...intakeData, competitors: e.target.value })}
+                          style={{ ...inputStyle, minHeight: "88px", resize: "vertical", lineHeight: 1.6 }}
+                        />
                       </div>
                       <div>
                         <label style={labelStyle}>Current Offers / Lead Magnets</label>
-                        <textarea placeholder="e.g. 20% off first order, Free PDF guide..." value={intakeData.offers} onChange={e => setIntakeData({ ...intakeData, offers: e.target.value })} style={{ ...inputStyle, minHeight: "80px", resize: "vertical" }} />
+                        <textarea
+                          placeholder="e.g. 20% off first order, Free PDF guide..."
+                          value={intakeData.offers}
+                          onChange={e => setIntakeData({ ...intakeData, offers: e.target.value })}
+                          style={{ ...inputStyle, minHeight: "88px", resize: "vertical", lineHeight: 1.6 }}
+                        />
                       </div>
                     </div>
+
+                    {/* Channels */}
                     <div>
                       <label style={labelStyle}>Preferred Channels *</label>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: "12px" }}>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
                         {availableChannels.map(channel => {
                           const isSelected = intakeData.channels.includes(channel);
                           return (
-                            <div key={channel} onClick={() => setIntakeData({ ...intakeData, channels: isSelected ? intakeData.channels.filter(c => c !== channel) : [...intakeData.channels, channel] })}
-                              style={{ padding: "10px 20px", borderRadius: "20px", fontSize: "14px", fontWeight: 600, cursor: "pointer", background: isSelected ? "var(--orange)" : "var(--black3)", color: isSelected ? "white" : "#a0a0a0", border: `1px solid ${isSelected ? "var(--orange)" : "rgba(255,255,255,0.1)"}`, transition: "all 0.2s ease" }}>
+                            <button
+                              key={channel}
+                              type="button"
+                              onClick={() => setIntakeData({
+                                ...intakeData,
+                                channels: isSelected
+                                  ? intakeData.channels.filter(c => c !== channel)
+                                  : [...intakeData.channels, channel]
+                              })}
+                              style={{
+                                padding: "9px 20px",
+                                borderRadius: "20px",
+                                fontSize: "13px",
+                                fontWeight: 600,
+                                fontFamily: "'Outfit', sans-serif",
+                                cursor: "pointer",
+                                background: isSelected ? "var(--orange)" : "transparent",
+                                color: isSelected ? "white" : "#a0a0a0",
+                                border: `1px solid ${isSelected ? "var(--orange)" : "rgba(255,255,255,0.18)"}`,
+                                transition: "all 0.2s ease",
+                                boxShadow: isSelected ? "0 0 14px rgba(255,85,0,0.35)" : "none"
+                              }}
+                            >
                               {channel}
-                            </div>
+                            </button>
                           );
                         })}
                       </div>
                     </div>
-                    <button type="submit" className="btn-primary" style={{ padding: "18px", borderRadius: "10px", fontSize: "16px", fontWeight: 700, marginTop: "12px", letterSpacing: "0.05em" }}>PROCEED TO CHECKOUT</button>
+
+                    {/* Submit */}
+                    <button
+                      type="submit"
+                      className="btn-primary"
+                      style={{ padding: "18px", borderRadius: "10px", fontSize: "15px", fontWeight: 800, marginTop: "8px", letterSpacing: "0.08em", width: "100%" }}
+                    >
+                      PROCEED TO CHECKOUT
+                    </button>
+
                   </form>
                 </div>
               </motion.div>
