@@ -1,0 +1,14 @@
+# Root .gitignore — NE Project
+
+# Firebase Service Account Keys (ALL variants)
+firebaseServiceAccount*.json
+serviceAccountKey.json
+**/firebaseServiceAccount*.json
+
+# Environment Variables
+.env
+.env.*
+
+# OS Generated Files
+.DS_Store
+Thumbs.db
