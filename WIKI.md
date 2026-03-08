@@ -69,7 +69,7 @@ graph TD
 | Database | Firestore (NoSQL, document) | PostgreSQL (relational) | Fast to prototype; no schema migrations; Firebase Admin SDK is the only DB client needed |
 | Real-Time | Socket.IO over HTTP server | Firestore real-time listeners | Server-controlled broadcast; admin push without client polling |
 | File storage | Cloudinary | AWS S3 | Free tier handles MVP; media transformation built-in |
-| AI | Gemini 1.5 Flash | OpenAI GPT-4o | Google ecosystem fit; cheaper per token at this scale |
+| AI | Gemini 2.5 Flash | OpenAI GPT-4o | Google ecosystem fit; cheaper per token at this scale |
 
 ### Where to Go Deep
 
@@ -129,7 +129,7 @@ const isAdmin = currentUser && ADMIN_EMAILS.includes(currentUser.email);
 ```
 Client fills form → POST /api/ai/generate
 → aiController.js builds a structured prompt from productName + description + targetAudience + contentType
-→ Sends prompt to Gemini 1.5 Flash with responseMimeType: 'application/json'
+→ Sends prompt to Gemini 2.5 Flash with responseMimeType: 'application/json'
 → Parses the JSON response
 → If "image" type was requested: builds a Pollinations.ai URL from the returned imagePrompt
 → Returns all content types in a single response object
@@ -421,7 +421,7 @@ Admin also calls → api.post('/messages', { from, to, msg })
 | **Admin** | A user whose email is in the `ADMIN_EMAILS` array in `AuthContext.jsx`. Not enforced server-side. |
 | **Cron** | A scheduled job. Nexus uses `node-cron` to run `syncWithAdNetworks()` every night at midnight. |
 | **Cloudinary** | A cloud media platform. Nexus uses it to store and serve client-uploaded assets. |
-| **Gemini** | Google's large language model (Gemini 1.5 Flash). Powers the AI Content Studio. |
+| **Gemini** | Google's large language model (Gemini 2.5 Flash). Powers the AI Content Studio. |
 | **Pollinations.ai** | A free AI image generation service. Used to create image URLs from Gemini's image prompts. |
 | **Nodemailer** | A Node.js email sending library. Configured with SMTP credentials (SendGrid-compatible). |
 | **SMTP** | Simple Mail Transfer Protocol — the protocol used to send emails. |

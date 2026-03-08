@@ -151,6 +151,11 @@ SMTP_PASS=SG....
 EMAIL_FROM="Nexus Admin <noreply@nexusproject.com>"
 ADMIN_EMAIL=admin@yourcompany.com
 
+# Cloudinary (for file uploads)
+CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_api_key
+CLOUDINARY_API_SECRET=your_api_secret
+
 # Frontend URL (for email links)
 FRONTEND_URL=http://localhost:5173
 ```
