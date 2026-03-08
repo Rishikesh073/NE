@@ -3,11 +3,11 @@ const multer = require('multer');
 const { Readable } = require('stream');
 const db = require('../config/db');
 
-// 1. Configure Cloudinary (Replace with your actual credentials)
+// 1. Configure Cloudinary
 cloudinary.config({
-  cloud_name: 'dxgzkijjo',
-  api_key: '554168347247721',
-  api_secret: 'xsE7enhG-_D57dsy1gRyDqZiEtw'
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
 // 2. Configure Multer to hold the file in memory temporarily
