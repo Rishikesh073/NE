@@ -10,16 +10,17 @@ const { getClients, createClient, updateClientProfile } = require('../controller
 const { getTasks, createTask, updateTask } = require('../controllers/taskController');
 const { getMessages, createMessage } = require('../controllers/messageController');
 
-const { 
-  createServiceRequest, 
-  getServiceRequests, 
-  updateServiceRequest, 
-  approveServiceRequest, 
+const {
+  createServiceRequest,
+  getServiceRequests,
+  updateServiceRequest,
+  approveServiceRequest,
   rejectServiceRequest // Added reject function
-} = require('../controllers/serviceRequestController'); 
+} = require('../controllers/serviceRequestController');
 
 const { saveAsset, getAssets, upload } = require('../controllers/assetController');
-
+const { generateContent } = require('../controllers/aiController');
+const { createCheckoutSession, handleStripeWebhook } = require('../controllers/stripeController');
 
 // --- RATE LIMITER ---
 // Prevents DDoS attacks and spam bot submissions
@@ -38,27 +39,32 @@ router.post('/campaigns', verifyToken, createCampaign);
 // Clients
 router.get('/clients', verifyToken, getClients);
 router.post('/clients', verifyToken, createClient);
-router.put('/clients/:uid',verifyToken, updateClientProfile); // <-- NEW: Save Profile Data
+router.put('/clients/:uid', verifyToken, updateClientProfile); // <-- NEW: Save Profile Data
 
 // Tasks
-router.get('/tasks',verifyToken, getTasks);
+router.get('/tasks', verifyToken, getTasks);
 router.post('/tasks', verifyToken, createTask);
 router.put('/tasks/:id', verifyToken, updateTask);
 
 // Messages
-router.get('/messages',verifyToken, getMessages);
-router.post('/messages',verifyToken, createMessage);
+router.get('/messages', verifyToken, getMessages);
+router.post('/messages', verifyToken, createMessage);
 
 // Service Requests (AI Intake)
-router.get('/service-requests',verifyToken, getServiceRequests);
+router.get('/service-requests', verifyToken, getServiceRequests);
 router.post('/service-requests', verifyToken, createServiceRequest);
 router.put('/service-requests/:id', verifyToken, updateServiceRequest);
 router.put('/service-requests/:id/approve', verifyToken, approveServiceRequest);
 router.put('/service-requests/:id/reject', verifyToken, rejectServiceRequest); // <-- NEW: Admin Reject
 
+// Billing & Subscriptions
+router.post('/checkout/create-session', verifyToken, createCheckoutSession);
+// Note: Webhook must use express.raw({type: 'application/json'}) so it's usually defined directly in server.js before body parsers, but here it is for structure.
+
 // NEW: Assets Routes
-router.get('/assets',verifyToken, getAssets);
-router.post('/assets',verifyToken, upload, saveAsset);
+router.post('/ai/generate', verifyToken, generateContent);
+router.get('/assets', verifyToken, getAssets);
+router.post('/assets', verifyToken, upload, saveAsset);
 router.delete('/assets/:id', verifyToken, async (req, res) => {
   try {
     const db = require('../config/db');

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
 import toast, { Toaster } from "react-hot-toast";
+// eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from "framer-motion";
 import {
   AreaChart, Area, BarChart, Bar,
@@ -92,7 +93,6 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("overview");
 
   // LIVE DATA STATES
-  const [adminUser] = useState({ name: "Admin", initials: "AD" });
   const [campaigns, setCampaigns] = useState([]);
   const [clients, setClients] = useState([]);
   const [tasks, setTasks] = useState([]);
@@ -112,6 +112,16 @@ export default function AdminDashboard() {
   const [newTask, setNewTask] = useState({ title: "", clientId: "", status: "todo" });
   const [selectedChatClient, setSelectedChatClient] = useState(null);
   const [chatMsg, setChatMsg] = useState("");
+
+  // AI GENERATOR STATES
+  const [aiForm, setAiForm] = useState({
+    productName: "",
+    description: "",
+    targetAudience: "",
+    contentType: ["marketingCopy", "seoKeywords", "blogOutline", "image"]
+  });
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiResult, setAiResult] = useState(null);
 
   // SOCKET REF
   const socketRef = useRef(null);
@@ -150,6 +160,7 @@ export default function AdminDashboard() {
       try {
         // Wait for Firebase auth to be ready before making API calls
         await new Promise((resolve) => {
+          // eslint-disable-next-line no-unused-vars
           const unsubscribe = import('../services/firebase').then(({ auth }) => {
             if (auth.currentUser) { resolve(); return () => { }; }
             const unsub = auth.onAuthStateChanged(user => { if (user) { unsub(); resolve(); } });
@@ -203,6 +214,7 @@ export default function AdminDashboard() {
       setSelectedRequest(null);
       toast.success(`AI Agent deployed! Client upgraded to ${request.requirements.selectedTier} Tier.`);
     } catch (error) {
+      console.error(error);
       toast.error("Error approving request. Check console.");
     }
   };
@@ -216,6 +228,7 @@ export default function AdminDashboard() {
       setAdminFeedback("");
       toast.success("Brief bounced back to client for clarification.");
     } catch (error) {
+      console.error(error);
       toast.error("Error rejecting request.");
     }
   };
@@ -228,7 +241,7 @@ export default function AdminDashboard() {
       setShowCampaignModal(false);
       setNewCampaign({ name: "", clientId: "", channel: "Google Ads", spend: 0, leads: 0, status: "live" });
       toast.success("Campaign successfully deployed!");
-    } catch (error) { toast.error("Failed to create campaign."); }
+    } catch (error) { console.error(error); toast.error("Failed to create campaign."); }
   };
 
   const handleCreateTask = async (e) => {
@@ -241,7 +254,7 @@ export default function AdminDashboard() {
       socketRef.current?.emit("assign_task", createdTask);
       setNewTask({ title: "", clientId: "", status: "todo" });
       toast.success("Task Assigned to Client!");
-    } catch (err) { toast.error("Failed to assign task."); }
+    } catch (err) { console.error(err); toast.error("Failed to assign task."); }
   };
 
   const handleSendReply = async () => {
@@ -257,7 +270,25 @@ export default function AdminDashboard() {
     setChatMsg("");
     // ─── Emit via socket so client sees it instantly ───────────────────────
     socketRef.current?.emit("send_message", newMsg);
-    try { await api.post('/messages', newMsg); } catch (e) { }
+    try { await api.post('/messages', newMsg); } catch (e) { console.error(e); }
+  };
+
+  const handleGenerateContent = async (e) => {
+    e.preventDefault();
+    if (aiForm.contentType.length === 0) return toast.error("Select at least one content type!");
+
+    setAiGenerating(true);
+    const toastId = toast.loading("🤖 AI is dreaming up content...");
+    try {
+      const res = await api.post('/ai/generate', aiForm);
+      setAiResult(res.data);
+      toast.success("AI Content Generated Successfully!", { id: toastId });
+    } catch (error) {
+      console.error(error);
+      toast.error("Generation failed. Is GEMINI_API_KEY set in the backend?", { id: toastId });
+    } finally {
+      setAiGenerating(false);
+    }
   };
 
   const handleLogout = async () => {
@@ -277,6 +308,7 @@ export default function AdminDashboard() {
       setCampaigns(campRes.data);
       toast.success("Ad Networks Synced!", { id: toastId });
     } catch (error) {
+      console.error(error);
       toast.error("Failed to sync networks.", { id: toastId });
     }
   };
@@ -294,6 +326,7 @@ export default function AdminDashboard() {
   const sidebarItems = [
     { id: "overview", icon: "⊡", label: "Overview" },
     { id: "requests", icon: "⚡", label: "AI Briefs", badge: serviceRequests.filter(r => r.status === 'pending_admin_review').length || null },
+    { id: "aiGenerator", icon: "✨", label: "AI Content Studio" },
     { id: "clients", icon: "◉", label: "Clients", badge: clients.length || null },
     { id: "campaigns", icon: "▲", label: "Campaigns" },
     { id: "assets", icon: "📁", label: "Client Assets" },
@@ -430,6 +463,136 @@ export default function AdminDashboard() {
                     </tbody>
                   </table>
                 )}
+              </motion.div>
+            )}
+
+            {/* AI GENERATOR TAB */}
+            {activeTab === "aiGenerator" && (
+              <motion.div key="aiGenerator" variants={tabVariants} initial="initial" animate="animate" exit="exit"
+                style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px", alignItems: "start" }}>
+
+                {/* Input Form */}
+                <div className="card-hover" style={{ padding: "24px", borderRadius: "16px", background: "var(--card)", border: "1px solid var(--border)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "20px" }}>
+                    <div style={{ width: "32px", height: "32px", background: "var(--neon-pink)", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", color: "white" }}>✨</div>
+                    <h3 style={{ fontWeight: 700, fontSize: "18px" }}>Nexus AI Content Studio</h3>
+                  </div>
+
+                  <form onSubmit={handleGenerateContent} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                    <div>
+                      <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Product / Service Name</label>
+                      <input required placeholder="e.g. Nexus CRM" value={aiForm.productName} onChange={e => setAiForm({ ...aiForm, productName: e.target.value })} style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "var(--black)", color: "white", border: "1px solid var(--border)" }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Detailed Description</label>
+                      <textarea required rows={3} placeholder="What does this product do? What are its key benefits?" value={aiForm.description} onChange={e => setAiForm({ ...aiForm, description: e.target.value })} style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "var(--black)", color: "white", border: "1px solid var(--border)", resize: "none" }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Target Audience (Optional)</label>
+                      <input placeholder="e.g. Small business owners, Startup founders" value={aiForm.targetAudience} onChange={e => setAiForm({ ...aiForm, targetAudience: e.target.value })} style={{ width: "100%", padding: "12px", borderRadius: "8px", background: "var(--black)", color: "white", border: "1px solid var(--border)" }} />
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", display: "block", marginBottom: "10px" }}>Content Types to Generate</label>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                        {[
+                          { id: "marketingCopy", label: "Marketing Copy" },
+                          { id: "seoKeywords", label: "SEO Keywords" },
+                          { id: "blogOutline", label: "Blog Outline" },
+                          { id: "image", label: "Gen-AI Image" }
+                        ].map(type => (
+                          <label key={type.id} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px", background: "var(--black3)", borderRadius: "8px", cursor: "pointer", border: aiForm.contentType.includes(type.id) ? "1px solid var(--orange)" : "1px solid transparent" }}>
+                            <input
+                              type="checkbox"
+                              checked={aiForm.contentType.includes(type.id)}
+                              onChange={(e) => {
+                                const newTypes = e.target.checked
+                                  ? [...aiForm.contentType, type.id]
+                                  : aiForm.contentType.filter(t => t !== type.id);
+                                setAiForm({ ...aiForm, contentType: newTypes });
+                              }}
+                              style={{ accentColor: "var(--orange)", transform: "scale(1.1)" }}
+                            />
+                            <span style={{ fontSize: "13px", color: aiForm.contentType.includes(type.id) ? "white" : "var(--text-dimmer)" }}>{type.label}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <button type="submit" className="btn-primary" disabled={aiGenerating} style={{ padding: "14px", borderRadius: "8px", marginTop: "12px", filter: aiGenerating ? "grayscale(100%) opacity(0.7)" : "none" }}>
+                      {aiGenerating ? "GENERATING..." : "GENERATE AI STRATEGY"}
+                    </button>
+                    {aiResult && (
+                      <button type="button" className="btn-ghost" onClick={() => setAiResult(null)} style={{ padding: "14px", borderRadius: "8px", color: "var(--text-dimmer)" }}>CLEAR RESULT</button>
+                    )}
+                  </form>
+                </div>
+
+                {/* Output Area */}
+                <div style={{ display: "flex", flexDirection: "column", gap: "24px", maxHeight: "80vh", overflowY: "auto", paddingRight: "8px" }}>
+                  {!aiResult ? (
+                    <div className="card-hover" style={{ padding: "40px 24px", borderRadius: "16px", background: "var(--card)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", border: "1px dashed var(--border)", height: "100%", minHeight: "300px", opacity: 0.7 }}>
+                      <span style={{ fontSize: "40px", marginBottom: "16px", opacity: 0.5 }}>🤖</span>
+                      <h4 style={{ fontFamily: "'Bebas Neue'", fontSize: "20px", color: "var(--text-dimmer)" }}>YOUR GENERATED CONTENT</h4>
+                      <p style={{ fontSize: "13px", color: "var(--text-dim)", maxWidth: "250px" }}>Fill out the form to generate Marketing Copy, SEO Keywords, Blog Outlines, and Midjourney-style Images leveraging Gemini Flash.</p>
+                    </div>
+                  ) : (
+                    <>
+                      {aiResult._thinking && (
+                        <div style={{ padding: "16px", borderRadius: "12px", background: "rgba(0, 0, 0, 0.4)", border: "1px solid var(--border)", marginBottom: "8px" }}>
+                          <h4 style={{ fontSize: "11px", color: "var(--text-dimmer)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "8px", fontWeight: 700 }}>🧠 AI Strategic Reasoning</h4>
+                          <div style={{ fontSize: "13px", color: "var(--text-dim)", lineHeight: 1.5, fontStyle: "italic" }}>"{aiResult._thinking}"</div>
+                        </div>
+                      )}
+
+                      {aiResult.imageUrl && (
+                        <div className="card-hover" style={{ borderRadius: "16px", background: "var(--card)", overflow: "hidden", border: "1px solid var(--border)" }}>
+                          <img src={aiResult.imageUrl} alt="AI Generated" style={{ width: "100%", height: "auto", display: "block" }} />
+                          <div style={{ padding: "12px 16px", background: "var(--black2)", borderTop: "1px solid var(--border)" }}>
+                            <span style={{ fontSize: "11px", color: "var(--neon-green)", letterSpacing: "0.1em", fontFamily: "'JetBrains Mono'" }}>✓ GEMINI FLASH IMAGE (POLLINATIONS)</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {aiResult.marketingCopy && Array.isArray(aiResult.marketingCopy) && (
+                        <div className="card-hover" style={{ padding: "20px", borderRadius: "16px", background: "var(--card)", border: "1px solid var(--border)" }}>
+                          <h4 style={{ fontFamily: "'Bebas Neue'", fontSize: "20px", color: "var(--orange)", marginBottom: "16px", borderBottom: "1px solid var(--border)", paddingBottom: "8px" }}>Direct Response Variants (Optimized)</h4>
+                          <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                            {aiResult.marketingCopy.map((copy, i) => (
+                              <div key={i} style={{ background: "var(--black2)", padding: "16px", borderRadius: "12px", border: "1px solid rgba(255,85,0,0.2)" }}>
+                                <div style={{ fontSize: "12px", color: "var(--orange)", marginBottom: "8px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>{copy.variant || `Variant ${i + 1}`}</div>
+                                <div style={{ marginBottom: "8px", fontSize: "14px" }}><strong style={{ color: "white" }}>Hook:</strong> <span style={{ color: "var(--text-dim)" }}>{copy.hook}</span></div>
+                                <div style={{ marginBottom: "8px", fontSize: "14px" }}><strong style={{ color: "white" }}>Body:</strong> <span style={{ color: "var(--text-dim)" }}>{copy.body}</span></div>
+                                <div style={{ fontSize: "14px" }}><strong style={{ color: "white" }}>CTA:</strong> <span style={{ color: "var(--neon-green)" }}>{copy.cta}</span></div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {aiResult.seoKeywords && aiResult.seoKeywords.length > 0 && (
+                        <div className="card-hover" style={{ padding: "20px", borderRadius: "16px", background: "var(--card)", border: "1px solid var(--border)" }}>
+                          <h4 style={{ fontFamily: "'Bebas Neue'", fontSize: "20px", color: "var(--neon-blue)", marginBottom: "12px", borderBottom: "1px solid var(--border)", paddingBottom: "8px" }}>Targeted SEO Keywords</h4>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                            {aiResult.seoKeywords.map((kw, i) => (
+                              <span key={i} style={{ padding: "4px 10px", background: "var(--black2)", border: "1px solid rgba(0,255,148,0.3)", color: "var(--neon-green)", borderRadius: "4px", fontSize: "12px", fontFamily: "'JetBrains Mono'" }}>{kw}</span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {aiResult.blogOutline && (
+                        <div className="card-hover" style={{ padding: "20px", borderRadius: "16px", background: "var(--card)", border: "1px solid var(--border)" }}>
+                          <h4 style={{ fontFamily: "'Bebas Neue'", fontSize: "20px", color: "var(--neon-pink)", marginBottom: "12px", borderBottom: "1px solid var(--border)", paddingBottom: "8px" }}>Blog Post Outline</h4>
+                          <div style={{ fontSize: "14px", color: "var(--text-dim)", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
+                            {aiResult.blogOutline}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+
               </motion.div>
             )}
 

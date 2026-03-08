@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import api from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
+// eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from "framer-motion";
 import {
   AreaChart, Area, BarChart, Bar,
@@ -112,6 +113,21 @@ export default function ClientDashboard() {
     }
   }, [currentUser]);
 
+  // Check for Stripe Checkout redirects
+  useEffect(() => {
+    const query = new URLSearchParams(location.search);
+    if (query.get("success")) {
+      alert("Payment successful! Your AI Marketing brief has been submitted for Admin review.");
+      // Clean up URL
+      navigate('/dashboard', { replace: true });
+    }
+    if (query.get("canceled")) {
+      alert("Checkout was canceled.");
+      // Clean up URL
+      navigate('/dashboard', { replace: true });
+    }
+  }, [location, navigate]);
+
   const handleUpdatePassword = async (e) => {
     e.preventDefault();
     if (securityForm.newPassword !== securityForm.confirmPassword) return alert("New passwords do not match.");
@@ -133,6 +149,7 @@ export default function ClientDashboard() {
         window.recaptchaVerifier = null;
       }
     } catch (e) {
+      console.error("Recaptcha clear error:", e);
       // Ignore if already disconnected
     }
     window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', { size: 'invisible' });
@@ -153,7 +170,7 @@ export default function ClientDashboard() {
       console.error("MFA Error:", err);
       // Fallback cleanup if verifyPhoneNumber fails during recaptcha render
       if (window.recaptchaVerifier) {
-        try { window.recaptchaVerifier.clear(); window.recaptchaVerifier = null; } catch (e) { }
+        try { window.recaptchaVerifier.clear(); window.recaptchaVerifier = null; } catch (e) { console.error(e); }
       }
       alert("Failed to send MFA code: " + err.message + "\n\n(See browser console for details. Note: Identity Platform billing must be enabled in Firebase for SMS/MFA)");
     }
@@ -293,7 +310,7 @@ export default function ClientDashboard() {
       await api.put(`/clients/${currentUser.uid}`, profileForm);
       setClientData({ ...clientData, ...profileForm });
       alert("Profile updated securely.");
-    } catch (err) { alert("Error saving profile. Make sure Express server is running."); }
+    } catch (err) { console.error(err); alert("Error saving profile. Make sure Express server is running."); }
   };
 
   const handleProceedToCheckout = (e) => {
@@ -304,20 +321,22 @@ export default function ClientDashboard() {
 
   const processPaymentAndSubmit = async () => {
     try {
-      await api.post('/service-requests', {
+      const res = await api.post('/checkout/create-session', {
         clientId: currentUser.uid,
         clientName: profileForm.companyName || currentUser.displayName,
         clientEmail: currentUser.email,
-        requirements: intakeData,
-        status: "pending_admin_review",
-        submittedAt: new Date().toISOString()
+        requirements: intakeData
       });
-      setShowCheckout(false);
-      setActiveTab("overview");
-      const reqRes = await api.get('/service-requests').catch(() => ({ data: [] }));
-      setMyRequests(reqRes.data.filter(r => r.clientId === currentUser?.uid));
-      alert("AI Agent Brief submitted to Admin.");
-    } catch (error) { alert("Error submitting request."); }
+
+      if (res.data.url) {
+        window.location.href = res.data.url; // Redirect to Stripe
+      } else if (res.data.mockUrl) {
+        window.location.href = res.data.mockUrl; // Redirect to local mock if no stripe key
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Error initiating checkout session.");
+    }
   };
 
   const handleLogout = async () => { await logout(); navigate("/login"); };
@@ -334,7 +353,7 @@ export default function ClientDashboard() {
     setChatMsg("");
     // Emit via socket so admin sees it instantly
     socketRef.current?.emit("send_message", { ...newMsg, to: "admin_room" });
-    try { await api.post('/messages', newMsg); } catch (e) { }
+    try { await api.post('/messages', newMsg); } catch (e) { console.error(e); }
   };
 
   // SECURE CLOUDINARY API UPLOAD
@@ -363,7 +382,7 @@ export default function ClientDashboard() {
     try {
       await api.delete(`/assets/${assetId}`);
       setMyAssets(myAssets.filter(a => a.id !== assetId));
-    } catch (error) { alert("Failed to delete asset. Check server connection."); }
+    } catch (error) { console.error(error); alert("Failed to delete asset. Check server connection."); }
   };
 
   // SEARCH & FILTER LOGIC
@@ -1005,12 +1024,12 @@ export default function ClientDashboard() {
               className="card-hover" style={{ background: "var(--card)", padding: "40px", borderRadius: "16px", maxWidth: "400px", width: "100%", border: "1px solid var(--orange)" }}>
               <h2 style={{ fontFamily: "'Bebas Neue'", fontSize: "32px", color: "white", marginBottom: "8px" }}>SECURE CHECKOUT</h2>
               <p style={{ color: "var(--text-dim)", fontSize: "14px", marginBottom: "24px" }}>You are subscribing to the <strong style={{ color: "var(--orange)" }}>{intakeData.selectedTier}</strong> Protocol.</p>
-              <div style={{ padding: "16px", background: "var(--black)", borderRadius: "8px", border: "1px solid var(--border)", marginBottom: "24px", color: "var(--text-dimmer)", fontSize: "12px", textAlign: "center", fontWeight: 600 }}>
-                [ BILLING GATEWAY PAUSED FOR MVP ]
+              <div style={{ padding: "16px", background: "rgba(0, 255, 148, 0.1)", borderRadius: "8px", border: "1px solid rgba(0, 255, 148, 0.3)", marginBottom: "24px", color: "var(--neon-green)", fontSize: "13px", textAlign: "center", fontWeight: 500, lineHeight: 1.5 }}>
+                You will be redirected to our secure Stripe checkout portal to securely complete your subscription.
               </div>
               <div style={{ display: "flex", gap: "12px" }}>
                 <button className="btn-ghost" onClick={() => setShowCheckout(false)} style={{ flex: 1, padding: "12px", borderRadius: "8px", fontWeight: 600 }}>CANCEL</button>
-                <button className="btn-primary" onClick={processPaymentAndSubmit} style={{ flex: 2, padding: "12px", borderRadius: "8px", fontWeight: 700 }}>SUBMIT BRIEF</button>
+                <button className="btn-primary" onClick={processPaymentAndSubmit} style={{ flex: 2, padding: "12px", borderRadius: "8px", fontWeight: 700 }}>PROCEED TO PAYMENT →</button>
               </div>
             </motion.div>
           </motion.div>

@@ -1,5 +1,10 @@
 # Root .gitignore — NE Project
 
+# ─── Local Agent Skills (stay on this machine only) ───────────────────────────
+# The .agent/ folder contains local skills, workflows, and AI configurations.
+# These are machine-specific and should never be pushed to GitHub.
+.agent/
+
 # Firebase Service Account Keys (ALL variants)
 firebaseServiceAccount*.json
 serviceAccountKey.json
@@ -12,3 +17,16 @@ serviceAccountKey.json
 # OS Generated Files
 .DS_Store
 Thumbs.db
+
+# Node modules
+node_modules/
+**/node_modules/
+
+# Build outputs
+dist/
+build/
+.next/
+
+# Logs
+*.log
+npm-debug.log*

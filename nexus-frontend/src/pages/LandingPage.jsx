@@ -6,22 +6,22 @@ import { testimonials } from "../utils/mockData";
 
 export default function LandingPage() {
   const navigate = useNavigate();
+  // eslint-disable-next-line no-unused-vars
   const [testimonialIdx, setTestimonialIdx] = useState(0);
-  const [pricingHover, setPricingHover] = useState(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
   const pricingTiers = [
-    { 
-      name: "STARTER", price: 199, color: "white", featured: false, desc: "Perfect for local businesses.", 
-      features: ["1 AI Campaign", "Meta Ads Only", "Basic Analytics", "Email Support"] 
+    {
+      name: "STARTER", price: 199, color: "white", featured: false, desc: "Perfect for local businesses.",
+      features: ["1 AI Campaign", "Meta Ads Only", "Basic Analytics", "Email Support"]
     },
-    { 
-      name: "GROWTH", price: 299, color: "var(--orange)", featured: true, desc: "For scaling operations.", 
-      features: ["3 AI Campaigns", "Meta + Google Ads", "Advanced Analytics", "Priority Support"] 
+    {
+      name: "GROWTH", price: 299, color: "var(--orange)", featured: true, desc: "For scaling operations.",
+      features: ["3 AI Campaigns", "Meta + Google Ads", "Advanced Analytics", "Priority Support"]
     },
-    { 
-      name: "ENTERPRISE", price: 499, color: "white", featured: false, desc: "Full autonomous takeover.", 
-      features: ["Unlimited Campaigns", "Omnichannel Deployment", "Custom AI Models", "Dedicated Slack Channel"] 
+    {
+      name: "ENTERPRISE", price: 499, color: "white", featured: false, desc: "Full autonomous takeover.",
+      features: ["Unlimited Campaigns", "Omnichannel Deployment", "Custom AI Models", "Dedicated Slack Channel"]
     }
   ];
 
@@ -55,7 +55,7 @@ export default function LandingPage() {
     <div>
       {/* Hero */}
       <div className="grid-bg" style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "100px 40px 80px", position: "relative", overflow: "hidden" }}>
-        
+
         {/* Navbar */}
         <nav style={{ position: "absolute", top: 0, left: 0, right: 0, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "24px 48px", borderBottom: "1px solid var(--border)", background: "rgba(8,8,8,0.9)", backdropFilter: "blur(20px)", zIndex: 100 }}>
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
@@ -130,7 +130,7 @@ export default function LandingPage() {
             We don't just run ads. We deploy autonomous systems designed to scale your revenue.
           </p>
         </div>
-        
+
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "24px" }}>
           {coreServices.map((s, i) => (
             <div key={i} className="card-hover" style={{ padding: "32px", borderRadius: "16px", background: "var(--card)", border: "1px solid var(--border)", animation: `slide-up 0.5s ease ${i * 0.08}s both` }}>
@@ -152,7 +152,7 @@ export default function LandingPage() {
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "24px", maxWidth: "1000px", margin: "0 auto" }}>
           {pricingTiers.map((plan, i) => (
-            <div key={i} className="card-hover" onMouseEnter={() => setPricingHover(i)} onMouseLeave={() => setPricingHover(null)}
+            <div key={i} className="card-hover"
               style={{
                 padding: "40px", borderRadius: "20px",
                 background: plan.featured ? `linear-gradient(135deg, rgba(255,85,0,0.1), rgba(255,122,0,0.05))` : "var(--black)",
@@ -201,7 +201,7 @@ export default function LandingPage() {
 
       <footer style={{ padding: "60px", borderTop: "1px solid var(--border)", background: "var(--black2)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "20px" }}>
-          <div 
+          <div
             onDoubleClick={() => navigate("/admin-login")}
             style={{ fontFamily: "'Bebas Neue', cursive", fontSize: "28px", letterSpacing: "0.1em", cursor: "pointer", userSelect: "none" }}
           >
