@@ -59,6 +59,7 @@ const getAssets = async (req, res) => {
   try {
     const snapshot = await db.collection('assets').get();
 
+    const assets = [];
     snapshot.forEach(doc => assets.push({ id: doc.id, ...doc.data() }));
     res.status(200).json(assets);
   } catch (error) {

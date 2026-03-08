@@ -1,4 +1,5 @@
 // server.js
+require('dotenv').config(); // ← MUST be first — loads .env into process.env
 const express = require('express');
 const cors = require('cors');
 const http = require('http');

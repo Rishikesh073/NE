@@ -19,7 +19,7 @@ const {
 } = require('../controllers/serviceRequestController');
 
 const { saveAsset, getAssets, upload } = require('../controllers/assetController');
-const { generateContent } = require('../controllers/aiController');
+const { generateContent, generateContentAgent } = require('../controllers/aiController');
 const { createCheckoutSession, handleStripeWebhook } = require('../controllers/stripeController');
 
 // --- RATE LIMITER ---
@@ -61,8 +61,9 @@ router.put('/service-requests/:id/reject', verifyToken, rejectServiceRequest); /
 router.post('/checkout/create-session', verifyToken, createCheckoutSession);
 // Note: Webhook must use express.raw({type: 'application/json'}) so it's usually defined directly in server.js before body parsers, but here it is for structure.
 
-// NEW: Assets Routes
-router.post('/ai/generate', verifyToken, generateContent);
+// AI Routes
+router.post('/ai/generate', verifyToken, generateContent);             // Legacy: single-shot
+router.post('/ai/generate-agent', verifyToken, generateContentAgent);   // Agent: ReAct loop (Research→Draft→Critique→Revise)
 router.get('/assets', verifyToken, getAssets);
 router.post('/assets', verifyToken, upload, saveAsset);
 router.delete('/assets/:id', verifyToken, async (req, res) => {

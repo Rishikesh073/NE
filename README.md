@@ -29,7 +29,7 @@
 | Authentication | Firebase Admin — JWT token verification |
 | Real-Time | Socket.IO 4 |
 | Billing | Stripe 20 |
-| AI | Google Generative AI (Gemini 1.5 Flash) |
+| AI | Google Generative AI (Gemini 2.5 Flash) |
 | File Uploads | Multer + Cloudinary |
 | Email | Nodemailer (SMTP/SendGrid) |
 | Scheduling | node-cron |

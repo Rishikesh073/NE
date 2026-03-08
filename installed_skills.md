@@ -32,6 +32,15 @@ This document serves as a cheat sheet for all the AI Agent skills currently inst
 * **`readme`**: Expert technical writer that generates an **absurdly thorough** `README.md` — covering project overview, tech stack, prerequisites, local setup (step-by-step), architecture deep dive, all environment variables (table format), available scripts, testing guide, deployment instructions, and a troubleshooting section. Activate with: *"write readme", "create readme", "document this project"*.
 * **`code-documentation-doc-generate`**: Automated documentation generation from your code. Extracts information from source files, configs, and comments to produce API docs, architecture diagrams, and technical references that stay synchronized with your codebase. Activate when generating API docs, building a docs pipeline, or standardizing docs across the repo.
 
+## 🤖 AI Engineering & Agent Building
+
+* **`ai-agents-architect`**: Designs and builds autonomous AI agents with tool use, memory systems, planning strategies (ReAct loop, Plan-and-Execute), and multi-agent orchestration. Activate when: *"build an agent", "autonomous agent", "tool calling", "multi-agent system"*.
+* **`langgraph`**: Expert in LangGraph — the production-grade framework for stateful, multi-actor AI applications. Covers StateGraph construction, state reducers, conditional routing, checkpointers, human-in-the-loop, and streaming execution. Activate when: *"build with langgraph", "stateful agent", "graph workflow"*.
+* **`rag-engineer`**: Designs Retrieval-Augmented Generation (RAG) systems. Masters embedding pipelines, vector databases, semantic chunking (by meaning, not token count), hierarchical retrieval, and hybrid search (BM25 + vector). Activate when: *"build a RAG", "semantic search", "vector search", "chatbot over docs"*.
+* **`mcp-builder`**: Complete guide for creating high-quality MCP (Model Context Protocol) servers in TypeScript or Python. Covers tool design, input/output schemas (Zod/Pydantic), error handling, transport selection (stdio vs HTTP), and evaluation. Activate when: *"build an MCP server", "create MCP tools", "integrate external API via MCP"*.
+* **`agent-evaluation`**: Framework for testing and benchmarking LLM agents using behavioral contract testing, statistical evaluation (multi-run), adversarial testing, and reliability metrics. Prevents benchmark-to-production gaps. Activate when: *"evaluate my agent", "agent benchmarks", "test LLM reliability"*.
+* **`prompt-engineering`**: Expert guide on advanced prompt engineering patterns — chain-of-thought, few-shot learning, structured output, and LLM behavior optimization. Activate when: *"improve my prompt", "LLM output quality", "prompt strategy"*.
+
 ## ⚙️ Backend, Architecture & Fullstack
 * **`senior-fullstack`**: Comprehensive guide providing principles and processes for end-to-end fullstack development.
 * **`frontend-developer`**: Specialized logic for executing modern frontend tasks using React 19+ and Next.js 15+.

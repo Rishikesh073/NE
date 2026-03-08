@@ -1,4 +1,5 @@
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+// Lazy-initialize Stripe so it reads process.env AFTER dotenv.config() runs
+const getStripe = () => require('stripe')(process.env.STRIPE_SECRET_KEY);
 const db = require('../config/db');
 
 // Define Tier Prices (in cents for Stripe)
@@ -45,7 +46,7 @@ exports.createCheckoutSession = async (req, res) => {
             });
         }
 
-        const session = await stripe.checkout.sessions.create({
+        const session = await getStripe().checkout.sessions.create({
             payment_method_types: ['card'],
             customer_email: clientEmail,
             client_reference_id: docRef.id,
@@ -88,7 +89,7 @@ exports.handleStripeWebhook = async (req, res) => {
     let event;
 
     try {
-        event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+        event = getStripe().webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
     } catch (err) {
         console.error(`Webhook Error: ${err.message}`);
         return res.status(400).send(`Webhook Error: ${err.message}`);
