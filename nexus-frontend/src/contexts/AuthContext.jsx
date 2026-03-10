@@ -8,7 +8,9 @@ import {
   onAuthStateChanged,
   signOut,
   updateProfile,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  RecaptchaVerifier,
+  signInWithPhoneNumber
 } from "firebase/auth";
 import api from "../services/api";
 
@@ -74,6 +76,40 @@ export function AuthProvider({ children }) {
     return result;
   };
 
+  // 4. Phone Sign-In
+  const setupRecaptcha = (containerId) => {
+    if (!window.recaptchaVerifier) {
+      window.recaptchaVerifier = new RecaptchaVerifier(auth, containerId, {
+        size: 'invisible'
+      });
+    }
+    return window.recaptchaVerifier;
+  };
+
+  const loginWithPhone = (phoneNumber, appVerifier) => {
+    return signInWithPhoneNumber(auth, phoneNumber, appVerifier);
+  };
+
+  const handlePhoneLoginSuccess = async (user) => {
+    const isNewUser = user.metadata.creationTime === user.metadata.lastSignInTime;
+    if (isNewUser && !ADMIN_EMAILS.includes(user.email || user.phoneNumber)) {
+      try {
+        await api.post('/clients', {
+          uid: user.uid,
+          name: user.phoneNumber || "Phone User",
+          email: user.email || "",
+          plan: "Pending Request",
+          mrr: 0,
+          campaigns: 0,
+          since: new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+          avatar: "P"
+        });
+      } catch (err) {
+        console.error("Client auto-register error (may already exist):", err);
+      }
+    }
+  };
+
   const logout = () => signOut(auth);
 
   const resetPassword = (email) => sendPasswordResetEmail(auth, email);
@@ -94,6 +130,9 @@ export function AuthProvider({ children }) {
     registerClient,
     login,
     loginWithGoogle,
+    setupRecaptcha,
+    loginWithPhone,
+    handlePhoneLoginSuccess,
     logout,
     resetPassword
   };

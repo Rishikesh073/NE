@@ -2,7 +2,7 @@ import axios from 'axios';
 import { auth } from "./firebase"; // Adjust path if your firebase.js is in a different folder
 
 const api = axios.create({
-  baseURL: 'http://localhost:5000/api', // Points to your Node.js server
+  baseURL: (import.meta.env.VITE_API_URL || 'http://localhost:5000') + '/api', // Points to your Node.js server
 });
 
 // Axios Interceptor: Automatically grabs the active user's token before every single API call
